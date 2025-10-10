@@ -1,0 +1,5 @@
+- [ ] Figure out how to handle categorical data. 
+- [ ] Try a couple unsupervised and supervised models
+- [ ] Figure out what to do with missing data
+- [ ] Visualize data
+- [ ] Use ROC, AUC and confusion matrix to check for performance
