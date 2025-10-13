@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
-from utils.helpers import printoutput
+from utils.helpers import print_output
 from sklearn.linear_model import LinearRegression
 
 class LinReg:
@@ -23,9 +23,8 @@ class LinReg:
         #remove nulls
         # self.df.dropna()
 
-    def output(self):
-    
-            # Select numeric columns only
+    def train(self):
+        # Select numeric columns only
         numeric_df = self.df.select_dtypes(include=['int64', 'float64'])
 
         # Define target variable
@@ -48,17 +47,13 @@ class LinReg:
         # Initialize and train the Linear Regression model
         model = LinearRegression()
         model.fit(X_train, y_train)
-
         # Make predictions
         y_pred = model.predict(X_test)
+        return y_pred, y_test
 
+    def output(self):
+        y_pred, y_test = self.train()
+        print_output("linear", y_pred, y_test)
         # Evaluate the model
         mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        print(f"Mean Squared Error: {mse}")
-        print(f"R² Score: {r2}")
-
-        # Optional: display coefficients
-        coef_df = pd.DataFrame({'feature': X.columns, 'coefficient': model.coef_})
-        print(coef_df)
-                
+        print(mse)
