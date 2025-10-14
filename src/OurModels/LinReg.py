@@ -50,10 +50,12 @@ class LinReg:
         # Make predictions
         y_pred = model.predict(X_test)
         return y_pred, y_test
+    
+    def charts(self):
+        df = self.df
+
 
     def output(self):
         y_pred, y_test = self.train()
         print_output("linear", y_pred, y_test)
-        # Evaluate the model
-        mse = mean_squared_error(y_test, y_pred)
-        print(mse)
+       
