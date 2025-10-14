@@ -1,4 +1,5 @@
-from .LinReg import LinReg
+from .LinearRegressionModel import LinearRegressionModel
+from .SVCModel import SVCModel
 # import nbimporter
 
 # later you can add more
@@ -6,7 +7,8 @@ from .LinReg import LinReg
 # from .RandomForest import RandomForest
 
 __all__ = [
-    "LinReg",
+    "LinearRegressionModel",
+    "SVCModel",
     # "DecisionTree",
     # "RandomForest",
 ]
