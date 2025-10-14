@@ -78,17 +78,10 @@ def regression_graph(y_pred, y_test):
     plt.tight_layout()
     plt.show()
 
-def confusion_matrix(y_pred, y_test):
-        cnf_matrix = metrics.confusion_matrix(y_test, y_pred)
-        class_names=[0,1] # name  of classes
-        fig, ax = plt.subplots()
-        tick_marks = np.arange(len(class_names))
-        plt.xticks(tick_marks, class_names)
-        plt.yticks(tick_marks, class_names)
-        # create heatmap
-        sns.heatmap(pd.DataFrame(cnf_matrix), annot=True, cmap="YlGnBu" ,fmt='g')
-        ax.xaxis.set_label_position("top")
-        plt.tight_layout()
-        plt.title('Confusion matrix', y=1.1)
-        plt.ylabel('Actual label')
-        plt.xlabel('Predicted label')
+def output_confusion_matrix(y_pred, y_test):
+    from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap='Blues')
+    plt.title("Confusion Matrix")
+    plt.show()

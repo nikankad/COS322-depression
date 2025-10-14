@@ -1,5 +1,5 @@
 from sklearn.model_selection import train_test_split
-from utils.helpers import confusion_matrix, classification_metric
+from utils.helpers import output_confusion_matrix, classification_metric
 from sklearn.svm import SVC
 class SVCModel:
 
@@ -46,7 +46,7 @@ class SVCModel:
     
     def charts(self, y_pred, y_test):
         #generate charts 
-        confusion_matrix(y_pred, y_test)
+        output_confusion_matrix(y_pred, y_test)
 
     def test(self):
         #use test csv to test 
