@@ -1,7 +1,13 @@
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+from sklearn import metrics
+import seaborn as sns
+import numpy as np
+import pandas as pd
 
-#summarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv. id will just be the currentid+1
-def print_output(model_name, y_pred, y_test):
+
+#summarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv
+def regression_metrics(model_name, y_pred, y_test):
     mse = mean_squared_error(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
@@ -19,12 +25,70 @@ def print_output(model_name, y_pred, y_test):
     # R² Score (coefficient of determination)
     print(f"R² Score: {r2}")
 
+def classification_metric(model_name, y_pred, y_test):
+    from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+    )  
+        # Compute metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+    recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+
+    # Try computing ROC AUC (works only if probabilities available)
+    try:
+        if hasattr(model, "predict_proba"):
+            y_proba = model.predict_proba(X_test)[:, 1]
+            roc_auc = roc_auc_score(y_test, y_proba)
+        else:
+            roc_auc = None
+    except Exception:
+        roc_auc = None
+
+    # Print metrics
+    print("\n📊 SVC Model Performance")
+    print("-" * 40)
+    print(f"Accuracy : {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall   : {recall:.4f}")
+    print(f"F1 Score : {f1:.4f}")
+    if roc_auc is not None:
+        print(f"ROC AUC  : {roc_auc:.4f}")
+    else:
+        print("ROC AUC  : N/A (probabilities not available)")
+    print("-" * 40)
 
 
 
-    #generate sample_submission_{modelname_roc_mse_r^2}.csv
+def regression_graph(y_pred, y_test):
+    plt.figure(figsize=(7, 5))
+    # Scatter actual vs predicted
+    plt.scatter(y_test, y_pred, color='steelblue', alpha=0.6, label="Predicted vs Actual")
+    # Perfect prediction line
+    min_val = min(min(y_test), min(y_pred))
+    max_val = max(max(y_test), max(y_pred))
+    plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label="Perfect Fit")
 
+    # plt.title(f"{type} — Predicted vs Actual")
+    plt.xlabel("Actual Values")
+    plt.ylabel("Predicted Values")
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
 
-def pred_actual_graph():
-    #will output a graph of pred vs actual to see how our model did 
-    print("d")
+def confusion_matrix(y_pred, y_test):
+        cnf_matrix = metrics.confusion_matrix(y_test, y_pred)
+        class_names=[0,1] # name  of classes
+        fig, ax = plt.subplots()
+        tick_marks = np.arange(len(class_names))
+        plt.xticks(tick_marks, class_names)
+        plt.yticks(tick_marks, class_names)
+        # create heatmap
+        sns.heatmap(pd.DataFrame(cnf_matrix), annot=True, cmap="YlGnBu" ,fmt='g')
+        ax.xaxis.set_label_position("top")
+        plt.tight_layout()
+        plt.title('Confusion matrix', y=1.1)
+        plt.ylabel('Actual label')
+        plt.xlabel('Predicted label')

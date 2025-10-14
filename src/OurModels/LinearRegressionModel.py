@@ -1,31 +1,24 @@
-import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt
-from utils.helpers import print_output
+from utils.helpers import regression_metrics, regression_graph
 from sklearn.linear_model import LinearRegression
 
-class LinReg:
+class LinearRegressionModel:
 
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self):
         """
         Initialize the Linear Regression model.
 
         Parameters
         ----------
-        **kwargs : dict
-            Any valid sklearn.linear_model.LinearRegression parameter.
-            Example: fit_intercept=True, copy_X=True, n_jobs=None
+        df: Dataframe
         """
-        self.df = df.copy() 
-        self.model = LinearRegression()
-        
-        #remove nulls
-        # self.df.dropna()
+        self.model = LinearRegression()        
+        # remove nulls
 
-    def train(self):
+    def train(self, df):
         # Select numeric columns only
-        numeric_df = self.df.select_dtypes(include=['int64', 'float64'])
+        df.dropna()
+        numeric_df = df.select_dtypes(include=['int64', 'float64'])
 
         # Define target variable
         target_column = 'depression'  # replace with your numeric target
@@ -35,7 +28,7 @@ class LinReg:
             raise ValueError(f"Target column '{target_column}' not found or not numeric")
 
         # Features and target
-        X = numeric_df.drop(columns=[target_column])
+        X = numeric_df.drop(columns=[target_column, "id"])
         y = numeric_df[target_column]
 
         # Handle any NaNs in features by imputing with the mean
@@ -45,17 +38,19 @@ class LinReg:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         # Initialize and train the Linear Regression model
-        model = LinearRegression()
-        model.fit(X_train, y_train)
+        self.model.fit(X_train, y_train)
         # Make predictions
-        y_pred = model.predict(X_test)
+        y_pred = self.model.predict(X_test)
         return y_pred, y_test
-    
-    def charts(self):
-        df = self.df
+    def charts(self, y_pred, y_test):
+        #generate charts 
+        regression_graph(y_pred, y_test)
+
+    def test(self):
+        #use test csv to test 
+        print("test")
 
 
-    def output(self):
-        y_pred, y_test = self.train()
-        print_output("linear", y_pred, y_test)
+    def output(self, y_pred, y_test):
+        regression_metrics("linear", y_pred, y_test)
        
