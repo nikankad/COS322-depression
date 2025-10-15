@@ -1,5 +1,5 @@
 from sklearn.model_selection import train_test_split
-from utils.helpers import generate_classification_charts, classification_metric
+from utils.helpers import output_confusion_matrix, classification_metric
 from sklearn.svm import SVC
 
 class SVCModel:
@@ -48,9 +48,7 @@ class SVCModel:
     
     def charts(self, y_pred, y_test):
         #generate charts 
-        y_pred_prob = self.model.predict_proba(self.X_test)[:, 1]
-
-        generate_classification_charts(y_pred, y_test, y_pred_prob)
+        output_confusion_matrix(y_pred, y_test)
 
     def test(self):
         #use test csv to test 

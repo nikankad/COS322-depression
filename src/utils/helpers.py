@@ -63,24 +63,10 @@ def regression_graph(y_pred, y_test):
     plt.tight_layout()
     plt.show()
 
-def generate_classification_charts(y_pred, y_test, y_pred_prob):
-        cm = sk_confusion_matrix(y_test, y_pred)
-
-        # Display the confusion matrix
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Negative', 'Positive'])
-        disp.plot(cmap=plt.cm.Blues)
-        plt.title('Confusion Matrix')
-        plt.show()
-
-        # ROC Curve
-        fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob)
-        auc = roc_auc_score(y_test, y_pred_prob)
-
-        plt.figure()
-        plt.plot(fpr, tpr, color='darkorange', label=f"ROC curve (AUC = {auc:.2f})")
-        plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title("Receiver Operating Characteristic (ROC) Curve")
-        plt.legend(loc="lower right")
-        plt.show()
+def output_confusion_matrix(y_pred, y_test):
+    from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap='Blues')
+    plt.title("Confusion Matrix")
+    plt.show()
