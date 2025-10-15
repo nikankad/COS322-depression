@@ -1,5 +1,5 @@
 from sklearn.model_selection import train_test_split
-from utils.helpers import output_confusion_matrix, classification_metric
+# from utils.helpers import output_confusion_matrix, classification_metric
 from sklearn.svm import SVC
 
 class SVCModel:
