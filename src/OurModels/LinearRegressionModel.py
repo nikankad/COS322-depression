@@ -7,10 +7,6 @@ class LinearRegressionModel:
     def __init__(self):
         """
         Initialize the Linear Regression model.
-
-        Parameters
-        ----------
-        df: Dataframe
         """
         self.model = LinearRegression()        
         # remove nulls
@@ -49,7 +45,6 @@ class LinearRegressionModel:
     def test(self):
         #use test csv to test 
         print("test")
-
 
     def output(self, y_pred, y_test):
         regression_metrics("linear", y_pred, y_test)

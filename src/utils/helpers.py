@@ -1,10 +1,5 @@
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import matplotlib.pyplot as plt
-from sklearn import metrics
-import seaborn as sns
-import numpy as np
-import pandas as pd
-
 
 #summarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv
 def regression_metrics(model_name, y_pred, y_test):
@@ -28,7 +23,7 @@ def regression_metrics(model_name, y_pred, y_test):
 def classification_metric(model_name, y_pred, y_test):
     from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
-    f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+    f1_score, roc_auc_score 
     )  
         # Compute metrics
     accuracy = accuracy_score(y_test, y_pred)

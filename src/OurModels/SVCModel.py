@@ -5,11 +5,7 @@ class SVCModel:
 
     def __init__(self):
         """
-        Initialize the Linear Regression model.
-
-        Parameters
-        ----------
-        df: Dataframe
+        Initialize the SVC model.
         """
         self.model = SVC(kernel='rbf', C=1.0, gamma='scale')        
         # remove nulls
