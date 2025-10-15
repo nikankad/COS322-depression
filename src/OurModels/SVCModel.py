@@ -2,8 +2,6 @@ from sklearn.model_selection import train_test_split
 from utils.helpers import generate_classification_charts, classification_metric
 from sklearn.svm import SVC
 
-import matplotlib.pyplot as plt
-
 class SVCModel:
 
     def __init__(self):
@@ -15,12 +13,12 @@ class SVCModel:
         # Store test data for charts
         self.X_test = None
         self.y_test = None
-
+        
 
     def train(self, df):
+        df.dropna(inplace=True)
         # Select numeric columns only
         numeric_df = df.select_dtypes(include=['int64', 'float64'])
-        df.dropna()
         # Define target variable
         target_column = 'depression'  # replace with your numeric target
 
@@ -32,14 +30,10 @@ class SVCModel:
         X = numeric_df.drop(columns=[target_column, "id"])
         y = numeric_df[target_column]
 
-        # Handle any NaNs in features by imputing with the mean
-        X = X.fillna(X.mean())
-
         # Split into training and test sets
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-
-        # Initialize and train the Linear Regression model
+        # Initialize and train the SVC model
         self.model.fit(X_train, y_train)
 
 

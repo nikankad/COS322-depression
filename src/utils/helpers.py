@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np 
 import seaborn as sns
 import pandas as pd
-from sklearn.metrics import confusion_matrix as sk_confusion_matrix, roc_curve, roc_auc_score
+from sklearn.metrics import confusion_matrix as sk_confusion_matrix, roc_curve, roc_auc_score, ConfusionMatrixDisplay
 
 #students_dfsummarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv
 def regression_metrics(model_name, y_pred, y_test):
@@ -64,20 +64,12 @@ def regression_graph(y_pred, y_test):
     plt.show()
 
 def generate_classification_charts(y_pred, y_test, y_pred_prob):
-        # Confusion Matrix
-        cnf_matrix = sk_confusion_matrix(y_test, y_pred)
-        class_names = [0, 1]  # name of classes
-        fig, ax = plt.subplots()
-        tick_marks = np.arange(len(class_names))
-        plt.xticks(tick_marks, class_names)
-        plt.yticks(tick_marks, class_names)
-        # create heatmap
-        sns.heatmap(pd.DataFrame(cnf_matrix), annot=True, cmap="YlGnBu", fmt='g')
-        ax.xaxis.set_label_position("top")
-        plt.tight_layout()
-        plt.title('Confusion Matrix', y=1.1)
-        plt.ylabel('Actual label')
-        plt.xlabel('Predicted label')
+        cm = sk_confusion_matrix(y_test, y_pred)
+
+        # Display the confusion matrix
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Negative', 'Positive'])
+        disp.plot(cmap=plt.cm.Blues)
+        plt.title('Confusion Matrix')
         plt.show()
 
         # ROC Curve
