@@ -13,7 +13,6 @@ class LinearRegressionModel:
 
     def train(self, df):
         # Select numeric columns only
-        df.dropna()
         numeric_df = df.select_dtypes(include=['int64', 'float64'])
 
         # Define target variable
