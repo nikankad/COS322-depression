@@ -1,12 +1,11 @@
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import matplotlib.pyplot as plt
-from sklearn import metrics
+import numpy as np 
 import seaborn as sns
-import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix as sk_confusion_matrix, roc_curve, roc_auc_score, ConfusionMatrixDisplay
 
-
-#summarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv
+#students_dfsummarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv
 def regression_metrics(model_name, y_pred, y_test):
     mse = mean_squared_error(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
@@ -28,7 +27,7 @@ def regression_metrics(model_name, y_pred, y_test):
 def classification_metric(model_name, y_pred, y_test):
     from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
-    f1_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+    f1_score, roc_auc_score 
     )  
         # Compute metrics
     accuracy = accuracy_score(y_test, y_pred)
@@ -36,15 +35,6 @@ def classification_metric(model_name, y_pred, y_test):
     recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
     f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
 
-    # Try computing ROC AUC (works only if probabilities available)
-    try:
-        if hasattr(model, "predict_proba"):
-            y_proba = model.predict_proba(X_test)[:, 1]
-            roc_auc = roc_auc_score(y_test, y_proba)
-        else:
-            roc_auc = None
-    except Exception:
-        roc_auc = None
 
     # Print metrics
     print("\n📊 SVC Model Performance")
@@ -53,13 +43,8 @@ def classification_metric(model_name, y_pred, y_test):
     print(f"Precision: {precision:.4f}")
     print(f"Recall   : {recall:.4f}")
     print(f"F1 Score : {f1:.4f}")
-    if roc_auc is not None:
-        print(f"ROC AUC  : {roc_auc:.4f}")
-    else:
-        print("ROC AUC  : N/A (probabilities not available)")
     print("-" * 40)
-
-
+    
 
 def regression_graph(y_pred, y_test):
     plt.figure(figsize=(7, 5))
