@@ -53,7 +53,9 @@ class RandomForestRegressorModel:
         """
         Train the RandomForest on numeric features of df and return (y_pred, y_test).
         """
+
         X, y = self._prepare_xy(df, target_column="depression")
+        X.drop(columns=['id'], inplace=True, errors='ignore')
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=self.model.random_state, stratify=y if len(np.unique(y))>1 else None
@@ -118,7 +120,7 @@ class RandomForestRegressorModel:
                     "importance": importances
                 }).sort_values("importance", ascending=False).reset_index(drop=True)
                 print("Top feature importances:")
-                print(fi_df.head(10))
+                print(fi_df.head(15))
         except Exception:
             pass
 
