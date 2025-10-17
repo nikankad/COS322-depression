@@ -6,7 +6,7 @@ import numpy as np
 
 class RandomForestRegressorModel:
 
-    def __init__(self, n_estimators: int = 200, max_depth: int = None, random_state: int = 42):
+    def __init__(self, n_estimators: int = 500, max_depth: int = None, random_state: int = 42):
         """
         RandomForest wrapper with the same API as your SVCModel.
 
