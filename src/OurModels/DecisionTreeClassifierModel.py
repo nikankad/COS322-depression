@@ -1,26 +1,21 @@
+#use cross validation
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
 import pandas as pd
+from sklearn.metrics import accuracy_score
 from utils.helpers import generate_classification_charts
+from sklearn.model_selection import cross_val_score, KFold
 
-
-class RandomForestRegressorModel:  # name kept as you had it, but it's a classifier
-    def __init__(self, n_estimators: int = 200, max_depth: int = None, random_state: int = 42):
-        self.model = RandomForestClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            oob_score=True,
-            n_jobs=-1,
-            random_state=random_state,
-            class_weight=None, 
-            criterion='gini'
-    )
+class DecisionTreeClassifierModel:
+    def __init__(self, max_depth:None):
+        self.model = DecisionTreeClassifier(max_depth=max_depth)
         self.X_test = None
         self.y_test = None
         self.y_pred = None
 
     def _prepare_xy(self, df: pd.DataFrame, target_column: str = "depression"):
         df = df.copy()
+        # df.drop('id')
 
         # Require target column
         if target_column not in df.columns:
@@ -65,14 +60,14 @@ class RandomForestRegressorModel:  # name kept as you had it, but it's a classif
         if X.shape[0] == 0:
             raise ValueError("After filtering invalid/missing targets, there are 0 samples left.")
 
-        return X, y, ids
+        return X, y
 
     def train(self, df: pd.DataFrame):
         """
         Train on numeric features and return:
         y_pred, y_test, id_test, X_test
         """
-        X, y, ids = self._prepare_xy(df, target_column="depression")
+        X, y = self._prepare_xy(df, target_column="depression")
 
         # Stratify only if more than one class present
         stratify = y if y.nunique() > 1 else None
@@ -88,28 +83,16 @@ class RandomForestRegressorModel:  # name kept as you had it, but it's a classif
         return y_pred, y_test
     
 
-    def output(self, y_pred, y_test):
-        y_pred_prob = self.model.predict(self.X_test)
-
-        # Feature importances
-        importances = self.model.feature_importances_
-
-        # Predicted probabilities (not class labels)
-        y_pred_prob = self.model.predict_proba(self.X_test)[:, 1]
-
-        # Create feature importance DataFrame
-        fi_df = (
-            pd.DataFrame({
-                "feature": self.X_test.columns,
-                "importance": importances
-            })
-            .sort_values("importance", ascending=False)
-            .reset_index(drop=True)
-        )
-
-        print("Top feature importances:")
-        print(fi_df.head(15))
-
-        # Generate charts
-        generate_classification_charts(y_pred, y_test, y_pred_prob)
-
+    def output(self, y_pred, y_test):  
+        # Model Accuracy, how often is the classifier correct?
+        print("Accuracy:", accuracy_score(y_test, y_pred))
+    
+    def crossproduct(self):
+        num_folds = 5
+        kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+        cross_val_results = cross_val_score(self.model, X, y, cv=kf)
+        print("Cross-Validation Results (Accuracy):")
+        for i, result in enumerate(cross_val_results, 1):
+            print(f"  Fold {i}: {result * 100:.2f}%")
+            
+        print(f'Mean Accuracy: {cross_val_results.mean()* 100:.2f}%')
