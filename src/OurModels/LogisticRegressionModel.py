@@ -27,7 +27,9 @@ class LogisticRegressionModel:
         self.X_test = None
         self.y_test = None
 
-    def _prepare_xy(self, df: pd.DataFrame, target_column: str = "depression"):
+    def _prepare_xy(self, df: pd.DataFrame):
+        df = df.select_dtypes(include=['float64', 'int64'])
+        df.dropna(inplace=True)
         X = df.iloc[:, : -1]
         #Target values
         y = df['depression']
@@ -40,7 +42,7 @@ class LogisticRegressionModel:
         Train the RandomForest on numeric features of df and return (y_pred, y_test).
         """
 
-        X, y = self._prepare_xy(df, target_column='depression')
+        X, y = self._prepare_xy(df)
 
         # X.drop(columns=['id'], inplace=True, errors='ignore')
 
@@ -56,20 +58,30 @@ class LogisticRegressionModel:
         y_pred = self.model.predict(X_test)
 
         return y_pred, y_test
-    def report(self):
+    def output(self, y_pred, y_test):
         #Plot matrix
-        cnf_matrix = metrics.confusion_matrix(self.y_test, self.y_pred)
-        plt.figure(figsize=(6,4))
-        sns.heatmap(cnf_matrix, annot=True, fmt ='d', cmap='Blues', cbar=False)
-        plt.title('Confusion Matrix')
-        plt.xlabel('Predicted')
-        plt.ylabel('Actual')
-        plt.show()
+        # Confusion Matrix
+        confusion_mtx = metrics.confusion_matrix(y_test, self.model.predict(self.X_test))
+        sns.heatmap(confusion_mtx, annot=True, fmt='d', cmap='Blues')
+        plt.pyplot.title('Confusion Matrix')
+        plt.pyplot.xlabel('Predicted')
+        plt.pyplot.ylabel('Actual')
+        plt.pyplot.show()
 
-        #Classification report
-        print(classification_report(*results))
+        # R^2 Score
+        r2_score = metrics.r2_score(y_test, self.model.predict(self.X_test))
+        print(f'R^2 Score: {r2_score}')
 
-        #AUC ROC
-        y_prob = model.predict_proba(X_test)[:, 1]
-        auc_roc = roc_auc_score(y_test, y_prob)
-        print("AUC ROC ", auc_roc)
+        # ROC Curve
+        y_prob = self.model.predict_proba(self.X_test)[:, 1]
+        fpr, tpr, thresholds = metrics.roc_curve(y_test, y_prob)
+        roc_auc = metrics.auc(fpr, tpr)
+        plt.pyplot.plot(fpr, tpr, label=f'ROC Curve (area = {roc_auc:.2f})')
+        plt.pyplot.plot([0, 1], [0, 1], 'k--')
+        plt.pyplot.xlim([0.0, 1.0])
+        plt.pyplot.ylim([0.0, 1.05])
+        plt.pyplot.xlabel('False Positive Rate')
+        plt.pyplot.ylabel('True Positive Rate')
+        plt.pyplot.title('Receiver Operating Characteristic')
+        plt.pyplot.legend(loc='lower right')
+        plt.pyplot.show()

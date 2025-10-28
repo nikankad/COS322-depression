@@ -7,4 +7,5 @@ __all__ = [
     "SVCModel",
     "RandomForestRegressorModel",
     "DecisionTreeClassifierModel",
+    "LogisticRegressionModel",
 ]

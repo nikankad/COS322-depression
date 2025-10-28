@@ -156,27 +156,27 @@ def preprocessing(df: pd.DataFrame)->pd.DataFrame:
         if 'profession' in df.columns:
             df['profession'] = le.fit_transform(df['profession'].astype(str))
 
-        #scale our data
-        scaler = StandardScaler()
-        numeric_cols = df.select_dtypes(include=["number"]).columns.drop({'id', 'gender', 'suicidal_thoughts', 'family_mental_illness', 'depression', 'working_student'})
-        df[numeric_cols] = scaler.fit_transform(df[numeric_cols]) 
+        # #scale our data
+        # scaler = StandardScaler()
+        # numeric_cols = df.select_dtypes(include=["number"]).columns.drop({'id', 'gender', 'suicidal_thoughts', 'family_mental_illness', 'depression', 'working_student'})
+        # df[numeric_cols] = scaler.fit_transform(df[numeric_cols]) 
 
-        # Clean column names
-        load_dotenv()
-        gdpdf = pd.read_csv(os.environ['GDP_LOCATION'])
+        # # Clean column names
+        # load_dotenv()
+        # gdpdf = pd.read_csv(os.environ['GDP_LOCATION'])
 
-        gdpdf.columns = gdpdf.columns.str.strip()
-        gdpdf.rename(columns=lambda x: x.replace('\xa0', ' '), inplace=True)
+        # gdpdf.columns = gdpdf.columns.str.strip()
+        # gdpdf.rename(columns=lambda x: x.replace('\xa0', ' '), inplace=True)
 
-        # Group GDP data by city name and sum GDP
-        gdp_summed = (
-            gdpdf.groupby("Metropolitan area", as_index=False)["Nominal GDP"]
-            .sum()
-            .rename(columns={"Metropolitan area": "city", "Nominal GDP": "total_gdp"})
-        )
+        # # Group GDP data by city name and sum GDP
+        # gdp_summed = (
+        #     gdpdf.groupby("Metropolitan area", as_index=False)["Nominal GDP"]
+        #     .sum()
+        #     .rename(columns={"Metropolitan area": "city", "Nominal GDP": "total_gdp"})
+        # )
 
 
-        # Merge into your existing cities_df
-        df = df.merge(gdp_summed, on="city", how="left")
+        # # Merge into your existing cities_df
+        # df = df.merge(gdp_summed, on="city", how="left")
 
         return df
