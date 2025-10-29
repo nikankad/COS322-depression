@@ -1,5 +1,4 @@
 from sklearn.model_selection import train_test_split
-from utils.helpers import  classification_metric
 from sklearn.svm import SVC
 
 class SVCModel:
@@ -45,16 +44,4 @@ class SVCModel:
         y_pred = self.model.predict(X_test)
       
         return y_pred, y_test
-    
-    def charts(self, y_pred, y_test):
-        #generate charts 
-        output_confusion_matrix(y_pred, y_test)
-
-    def test(self):
-        #use test csv to test 
-        print("test")
-
-
-    def output(self, y_pred, y_test):
-        classification_metric("linear", y_pred, y_test)
     

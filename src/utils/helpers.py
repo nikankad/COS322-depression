@@ -1,86 +1,85 @@
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import matplotlib.pyplot as plt
-import numpy as np 
-import seaborn as sns
+
+from sklearn.calibration import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+import os
 import pandas as pd
-from sklearn.metrics import confusion_matrix as sk_confusion_matrix, roc_curve, roc_auc_score, ConfusionMatrixDisplay
+import numpy as np
+def preprocessing(df):
+    # Preprocessing
+    #rename columns
+    df.rename(columns={'Working Professional or Student': 'Working Student', 'Have you ever had suicidal thoughts ?': 'Suicidal Thoughts', 'Family History of Mental Illness':'Family Mental Illness' }, inplace=True)
 
-#students_dfsummarize model metric in string format and saves sample_submission_{modelname_roc_mse_r^2}.csv
-def regression_metrics(model_name, y_pred, y_test):
-    mse = mean_squared_error(y_test, y_pred)
-    mae = mean_absolute_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    rmse = mean_squared_error(y_test, y_pred)
-    """Print model performance metrics in a clean format."""
-    print(f"\n📊 Results for {model_name}:")
+    # Convert all column names to snake_case
+    df.columns = (
+        df.columns
+        .str.strip()                              # remove leading/trailing spaces
+        .str.replace(' ', '_')                    # replace spaces with underscores
+        .str.replace('[^A-Za-z0-9_]+', '', regex=True)  # remove special characters
+        .str.lower()            # convert to lowercase
+                         
+    )
+    # Convert Yes/No columns to binary (1/0)
+    df = df.map(lambda x: 1 if x == 'Yes' else 0 if x == 'No' else x)
+    # Make working_student binary: 1 if working, 0 if student
+    df['working_student'] = df['working_student'].map({'Working Professional': 1, 'Student': 0})
+    # Convert gender to binary: Male = 1, Female = 0
+    df['gender'] = df['gender'].map({'Male': 1, 'Female': 0})
+    # remove sleep_duration occurences that have less than 10 appearences
+    # Replace sleep_duration occurrences that have less than 10 appearances with the most common value
+    sleep_duration_mode = df['sleep_duration'].mode()[0]
+    df['sleep_duration'] = df['sleep_duration'].where(df['sleep_duration'].isin(df['sleep_duration'].value_counts()[df['sleep_duration'].value_counts() >= 10].index), sleep_duration_mode)
 
-    print(f"Mean Absolute Error (MAE): {mae}")
-    # Mean Squared Error
-    print(f"Mean Squared Error (MSE): {mse}")
+    # Replace dietary_habits occurrences that have less than 10 appearances with the most common value
+    dietary_habits_mode = df['dietary_habits'].mode()[0]
+    df['dietary_habits'] = df['dietary_habits'].where(df['dietary_habits'].isin(df['dietary_habits'].value_counts()[df['dietary_habits'].value_counts() >= 10].index), dietary_habits_mode)
+    df["dietary_habits"] = df["dietary_habits"].map({
+        "Unhealthy": 0,
+        "Moderate": 1,
+        "Healthy": 2
+    })
+    #if profession is student then make profession "Student"
+    df.loc[df["working_student"] == 0, "profession"] = "Student"
+    #If profession is still NaN, set to "Unemployed"
+    df.loc[df["profession"].isna(), "profession"] = "Unemployed"
+    #Map sleeping hours to numbers
+    df['sleep_duration'] = LabelEncoder().fit_transform(df['sleep_duration'])
+    df['degree'] = LabelEncoder().fit_transform(df['degree'])
+    # df['profession'] = LabelEncoder().fit_transform(df['degree'])
+    df.fillna(df.select_dtypes(include=['number']).mean(), inplace=True)
+    # df.dropna(inplace=True)
+    # df.fillna(0, inplace=True)
+    
+    scaler = StandardScaler()
+    # Scale only numeric columns that are not binary
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    non_binary_cols = [c for c in numeric_cols if set(df[c].dropna().unique()) != {0, 1}]
 
-    # Root Mean Squared Error
-    print(f"Root Mean Squared Error (RMSE): {rmse}")
+    df[non_binary_cols] = scaler.fit_transform(df[non_binary_cols])
 
-    # R² Score (coefficient of determination)
-    print(f"R² Score: {r2}")
+    return df
 
-def classification_metric(model_name, y_pred, y_test):
-    from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score,
-    f1_score, roc_auc_score 
-    )  
-        # Compute metrics
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average='weighted', zero_division=0)
-    recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
-    f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+import os
+import pandas as pd
+def generate_submission(y_pred):
+    """
+    Generates a CSV file with columns 'ids' and 'depression'
+    saved to the directory in the environment variable RESULSTS_LOCATION.
+    Expects y_pred to be a DataFrame or array-like with 'id' and 'y_pred' columns.
+    """
+    results_dir = os.getenv("RESULTS_LOCATION")
+    if not results_dir:
+        raise EnvironmentError("RESULTS_LOCATION not set in environment variables.")
+    
+    os.makedirs(results_dir, exist_ok=True)
+    output_path = os.path.join(results_dir, "submission.csv")
 
-
-    # Print metrics
-    print("\n📊 SVC Model Performance")
-    print("-" * 40)
-    print(f"Accuracy : {accuracy:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall   : {recall:.4f}")
-    print(f"F1 Score : {f1:.4f}")
-    print("-" * 40)
+    # Handle both DataFrame and tuple inputs
+    if isinstance(y_pred, pd.DataFrame):
+        df = y_pred.rename(columns={"id": "id", "y_pred": "depression"})
+    else:
+        raise TypeError("y_pred must be a DataFrame with 'id' and 'y_pred' columns.")
+    
+    df.to_csv(output_path, index=False)
+    print(f"Submission saved to: {output_path}")
     
 
-def regression_graph(y_pred, y_test):
-    plt.figure(figsize=(7, 5))
-    # Scatter actual vs predicted
-    plt.scatter(y_test, y_pred, color='steelblue', alpha=0.6, label="Predicted vs Actual")
-    # Perfect prediction line
-    min_val = min(min(y_test), min(y_pred))
-    max_val = max(max(y_test), max(y_pred))
-    plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label="Perfect Fit")
-
-    # plt.title(f"{type} — Predicted vs Actual")
-    plt.xlabel("Actual Values")
-    plt.ylabel("Predicted Values")
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.show()
-
-def generate_classification_charts(y_pred, y_test, y_pred_prob):
-        cm = sk_confusion_matrix(y_test, y_pred)
-
-        # Display the confusion matrix
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Negative', 'Positive'])
-        disp.plot(cmap=plt.cm.Blues)
-        plt.title('Confusion Matrix')
-        plt.show()
-
-        # ROC Curve
-        fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob)
-        auc = roc_auc_score(y_test, y_pred_prob)
-
-        plt.figure()
-        plt.plot(fpr, tpr, color='darkorange', label=f"ROC curve (AUC = {auc:.2f})")
-        plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title("Receiver Operating Characteristic (ROC) Curve")
-        plt.legend(loc="lower right")
-        plt.show()
