@@ -4,8 +4,19 @@ import pandas as pd
 from utils.helpers import generate_classification_charts
 
 
-class RandomForestRegressorModel:  # name kept as you had it, but it's a classifier
-    def __init__(self, n_estimators: int = 200, max_depth: int = None, random_state: int = 42):
+    def __init__(self, n_estimators: int = 500, max_depth: int = None, random_state: int = 42):
+        """
+        RandomForest wrapper with the same API as your SVCModel.
+
+        Parameters
+        ----------
+        n_estimators : int
+            Number of trees in the forest.
+        max_depth : int or None
+            Maximum depth of each tree.
+        random_state : int
+            RNG seed for reproducibility.
+        """
         self.model = RandomForestClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
