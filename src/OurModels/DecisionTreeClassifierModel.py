@@ -1,37 +1,21 @@
+#use cross validation
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
 import pandas as pd
+from sklearn.metrics import accuracy_score
 from utils.helpers import generate_classification_charts
+from sklearn.model_selection import cross_val_score, KFold
 
-
-def __init__(self, n_estimators: int = 500, max_depth: int = None, random_state: int = 42):
-        """        RandomForest wrapper with the same API as your SVCModel.
-
-        Parameters
-        ----------
-        n_estimators : int
-            Number of trees in the forest.
-        max_depth : int or None
-            Maximum depth of each tree.
-        random_state : int
-            RNG seed for reproducibility.
-        """
-        self.model = RandomForestClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            oob_score=True,
-            n_jobs=-1,
-            random_state=random_state,
-            class_weight=None, 
-            criterion='gini'
-    )
+class DecisionTreeClassifierModel:
+    def __init__(self, max_depth:None):
+        self.model = DecisionTreeClassifier(max_depth=max_depth)
         self.X_test = None
         self.y_test = None
         self.y_pred = None
 
     def _prepare_xy(self, df: pd.DataFrame, target_column: str = "depression"):
         df = df.copy()
-        # df.dropna(inplace=True)
+        # df.drop('id')
 
         # Require target column
         if target_column not in df.columns:
@@ -76,14 +60,14 @@ def __init__(self, n_estimators: int = 500, max_depth: int = None, random_state:
         if X.shape[0] == 0:
             raise ValueError("After filtering invalid/missing targets, there are 0 samples left.")
 
-        return X, y, ids
+        return X, y
 
     def train(self, df: pd.DataFrame):
         """
         Train on numeric features and return:
         y_pred, y_test, id_test, X_test
         """
-        X, y, ids = self._prepare_xy(df, target_column="depression")
+        X, y = self._prepare_xy(df, target_column="depression")
 
         # Stratify only if more than one class present
         stratify = y if y.nunique() > 1 else None
@@ -97,9 +81,18 @@ def __init__(self, n_estimators: int = 500, max_depth: int = None, random_state:
 
         y_pred = self.model.predict(X_test)
         return y_pred, y_test
+    
 
-
-    def output(df):
-        print("test")
-    def predict(self):
-        return 1
+    def output(self, y_pred, y_test):  
+        # Model Accuracy, how often is the classifier correct?
+        print("Accuracy:", accuracy_score(y_test, y_pred))
+    
+    def crossproduct(self):
+        num_folds = 5
+        kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
+        cross_val_results = cross_val_score(self.model, X, y, cv=kf)
+        print("Cross-Validation Results (Accuracy):")
+        for i, result in enumerate(cross_val_results, 1):
+            print(f"  Fold {i}: {result * 100:.2f}%")
+            
+        print(f'Mean Accuracy: {cross_val_results.mean()* 100:.2f}%')
