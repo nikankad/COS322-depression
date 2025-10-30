@@ -52,8 +52,10 @@ def preprocessing(df):
     scaler = StandardScaler()
     # Scale only numeric columns that are not binary
     numeric_cols = df.select_dtypes(include=[np.number]).columns
-    non_binary_cols = [c for c in numeric_cols if set(df[c].dropna().unique()) != {0, 1}]
-
+    non_binary_cols = [
+    c for c in numeric_cols
+    if c != 'id' and set(df[c].dropna().unique()) != {0, 1}
+]
     df[non_binary_cols] = scaler.fit_transform(df[non_binary_cols])
 
     return df
