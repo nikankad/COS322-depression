@@ -64,16 +64,16 @@ def preprocessing(df):
     # If profession is still NaN, set to "Unemployed"
     df.loc[df["profession"].isna(), "profession"] = "Unemployed"
 
-    gdp_df = pd.read_csv(
-        "/Users/nikan/Desktop/School/Sems/Spring 2025/COS 322/COS322-depression/data/ExtraData/CityGDP.csv"
-    )
+    # gdp_df = pd.read_csv(
+    #     "/Users/nikan/Desktop/School/Sems/Spring 2025/COS 322/COS322-depression/data/ExtraData/CityGDP.csv"
+    # )
 
-    # Normalize city names for reliable merge
-    df["city"] = df["city"].str.strip().str.lower()
-    gdp_df["city"] = gdp_df["city"].str.strip().str.lower()
+    # # Normalize city names for reliable merge
+    # df["city"] = df["city"].str.strip().str.lower()
+    # gdp_df["city"] = gdp_df["city"].str.strip().str.lower()
 
-    # Merge GDP info
-    df = df.merge(gdp_df[["city", "gdp", "ppp"]], on="city", how="left")
+    # # Merge GDP info
+    # df = df.merge(gdp_df[["city", "gdp", "ppp"]], on="city", how="left")
 
     sleep = {
         "More than 8 hours": 9,
@@ -130,7 +130,7 @@ def preprocessing(df):
 
     # Identify numeric columns safely
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cols_to_scale = [c for c in numeric_cols if c not in ["id", "depression", "gdp"]]
+    cols_to_scale = [c for c in numeric_cols if c not in ["id", "depression",  'gender']]
 
     # Convert possible string numerics
     df[cols_to_scale] = df[cols_to_scale].apply(pd.to_numeric, errors="coerce")

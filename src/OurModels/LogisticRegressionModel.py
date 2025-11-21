@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
@@ -9,7 +9,6 @@ import pandas as pd
 
 
 class LogisticRegressionModel:
-
     def __init__(self):
         """
         LogisticRegression
@@ -22,7 +21,7 @@ class LogisticRegressionModel:
         self.y_pred = None
 
     def _prepare_xy(self, df: pd.DataFrame):
-        """Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
+        # """ Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
 
         numeric_df = df.select_dtypes(include=["int64", "float64", "int32", "float32"])
 
@@ -31,18 +30,16 @@ class LogisticRegressionModel:
         return X, y
 
     def train(self, df):
-        import numpy as np
-
         X, y = self._prepare_xy(df)
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
         self.model.fit(X_train, y_train)
-
         # Store test set for charts
         self.X_test = X_test
         self.y_test = y_test
         # Predict on test set
+        # add 2 numbers together
 
         y_pred = self.model.predict(X_test)
 
