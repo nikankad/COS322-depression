@@ -106,13 +106,15 @@ def preprocessing(df):
     df.loc[:, "sleep_duration"] = df["sleep_duration"].fillna(
         df["sleep_duration"].mode()[0]
     )
-
+    
     # Apply Label Encoding to sleep_duration
     label_encoder = LabelEncoder()
     # Degree
     df["degree"] = df["degree"].astype(str).fillna("Unknown")
     df["degree"] = label_encoder.fit_transform(df["degree"])
 
+    df["city"] = df["city"].astype(str).fillna("Unknown")
+    df["city"] = label_encoder.fit_transform(df["city"])
     # Profession
     df["profession"] = df["profession"].astype(str).fillna("Unknown")
     df["profession"] = label_encoder.fit_transform(df["profession"])
