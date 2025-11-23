@@ -1,11 +1,15 @@
 from .SVCModel import SVCModel
-from .RandomForestRegressorModel import RandomForestRegressorModel
+from .RandomForestRegressorModel import RandomForestClassifierModel
+from .XGBoostModel import XGBoostModel
 from .LogisticRegressionModel import LogisticRegressionModel
 from .DecisionTreeClassifierModel import DecisionTreeClassifierModel
-# from OurModels import LinearRegressionModel, RandomForestRegressorModel,
+from .NeuralNetwork import NeuralNetwork
+
 __all__ = [
     "SVCModel",
-    "RandomForestRegressorModel",
-    "DecisionTreeClassifierModel",
+    "RandomForestClassifierModel",
     "LogisticRegressionModel",
+    "XGBoostModel",
+    "NeuralNetwork",
+    "DecisionTreeClassifierModel",
 ]

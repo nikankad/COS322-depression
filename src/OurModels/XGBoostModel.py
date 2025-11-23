@@ -1,5 +1,5 @@
 from matplotlib import pyplot as plt
-from sklearn.ensemble import RandomForestClassifier 
+import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
@@ -7,13 +7,18 @@ import seaborn as sns
 from sklearn.metrics import roc_curve, auc
 import pandas as pd
 
-class RandomForestClassifierModel:
+class XGBoostModel:
 
     def __init__(self):
         """
         LogisticRegression
         """
-        self.model = RandomForestClassifier(max_depth=10)
+        self.model = xgb.XGBClassifier(
+        objective='multi:softmax',  # multiclass classification
+        num_class=3,
+        eval_metric='mlogloss',
+        use_label_encoder=False
+        )
         self.X_test = None
         self.y_test = None
         self.y_pred = None
