@@ -106,15 +106,15 @@ def preprocessing(df):
     df.loc[:, "sleep_duration"] = df["sleep_duration"].fillna(
         df["sleep_duration"].mode()[0]
     )
-    
+
     # Apply Label Encoding to sleep_duration
     label_encoder = LabelEncoder()
     # Degree
     df["degree"] = df["degree"].astype(str).fillna("Unknown")
     df["degree"] = label_encoder.fit_transform(df["degree"])
 
-    df["city"] = df["city"].astype(str).fillna("Unknown")
-    df["city"] = label_encoder.fit_transform(df["city"])
+    # df["city"] = df["city"].astype(str).fillna("Unknown")
+    # df["city"] = label_encoder.fit_transform(df["city"])
     # Profession
     df["profession"] = df["profession"].astype(str).fillna("Unknown")
     df["profession"] = label_encoder.fit_transform(df["profession"])
@@ -132,7 +132,19 @@ def preprocessing(df):
 
     # Identify numeric columns safely
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cols_to_scale = [c for c in numeric_cols if c not in ["id", "depression",  'gender']]
+    cols_to_scale = [
+        c
+        for c in numeric_cols
+        if c
+        not in [
+            "id",
+            "depression",
+            # "gender",
+            # "family_mental_illness",
+            # "working_student",
+            # "suicidal_thoughts",
+        ]
+    ]
 
     # Convert possible string numerics
     df[cols_to_scale] = df[cols_to_scale].apply(pd.to_numeric, errors="coerce")
