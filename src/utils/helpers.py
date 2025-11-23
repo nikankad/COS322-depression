@@ -123,7 +123,7 @@ def preprocessing(df):
 
     # # combine pressure columns
     # df["pressure"] = df["academic_pressure"] + df["work_pressure"]
-    df.drop(columns=["name"], inplace=True)
+    df.drop(columns=["name", "city"], inplace=True)
     # # Combine satisfaction columns
     # df["satisfaction"] = df["study_satisfaction"] + df["job_satisfaction"]
     # df.drop(columns=["study_satisfaction", "study_satisfaction"], inplace=True)

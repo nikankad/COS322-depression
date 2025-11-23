@@ -10,11 +10,6 @@ from sklearn.preprocessing import StandardScaler
 from keras.models import load_model
 
 
-# !add optimize class
-class LRFinder(keras.callbacks.Callback):
-    def
-
-
 class NeuralNetwork:
 
     def __init__(self):
