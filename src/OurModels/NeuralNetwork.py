@@ -21,7 +21,7 @@ class NeuralNetwork:
         """
         LogisticRegression
         """
-        self.input_dim = 16
+        self.input_dim = 17
         self.num_classes = 2
         self.model = None
 
@@ -51,7 +51,7 @@ class NeuralNetwork:
 
     def prepare_data(self, df):
         numeric_df = df.select_dtypes(include=["int64", "float64", "int32", "float32"])
-        X = numeric_df.drop(columns=["depression", "id"])
+        X = numeric_df.drop(columns=["depression, id"])
         y = numeric_df["depression"]
 
         """Preprocess and split data"""
