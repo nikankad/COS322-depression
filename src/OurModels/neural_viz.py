@@ -25,43 +25,67 @@ class NeuralNetworkVisualizer:
         # layer_sizes = input layer + units of each visualized layer
         self.layer_sizes = [input_size] + [l.units for l in self.visual_layers]
 
-    def _get_activations(self, input_sample):
-        """Forward pass collecting activations layer-by-layer."""
-        current_value = np.array(input_sample).reshape(1, -1)
-        activations = [current_value]  # input layer
+    def _get_all_sample_results(self, X):
+        """
+        Forward pass for ALL samples, collecting activations and final predictions.
+        
+        Returns:
+            all_activations: list of lists of np.arrays ( [ [sample1_activations], [sample2_activations], ... ] )
+            all_predictions: list of dicts ( [{'display_val': ..., 'predicted_class': ...}, ...] )
+        """
+        X = np.array(X)
+        all_activations = []
+        all_predictions = []
 
-        for layer in self.model.layers:
-            current_value = layer(current_value)
-            if layer in self.visual_layers:
-                activations.append(current_value.numpy())
+        for input_sample in X:
+            current_value = input_sample.reshape(1, -1)
+            sample_activations = [current_value]  # input layer
 
-        return activations
+            for layer in self.model.layers:
+                current_value = layer(current_value)
+                if layer in self.visual_layers:
+                    sample_activations.append(current_value.numpy())
 
-    def create_animation(self, input_sample):
-        activations = self._get_activations(input_sample)
+            # --- Calculate Model Prediction ---
+            final_raw = self.model(input_sample.reshape(1, -1)).numpy().ravel()
+            
+            if final_raw.shape[0] == 1:
+                # Binary sigmoid
+                display_val = float(final_raw[0])
+                predicted_idx = int(np.round(display_val))
+            else:
+                # Softmax
+                exps = np.exp(final_raw - np.max(final_raw))
+                probs = exps / exps.sum()
+                # Probability of class 1 (Assuming two classes)
+                display_val = float(probs[1]) 
+                predicted_idx = int(np.argmax(probs))
 
-        # ==========================================================
-        # TRUE MODEL PREDICTION (FIXED!)
-        # ==========================================================
-        final_raw = self.model(np.array(input_sample).reshape(1, -1)).numpy().ravel()
+            predicted_class = (
+                self.class_labels[predicted_idx]
+                if predicted_idx < len(self.class_labels)
+                else str(predicted_idx)
+            )
+            
+            all_activations.append(sample_activations)
+            all_predictions.append({
+                'display_val': display_val,
+                'predicted_class': predicted_class,
+                'input_sample': input_sample
+            })
 
-        # Decide if model is sigmoid or softmax
-        if final_raw.shape[0] == 1:
-            # Binary sigmoid
-            display_val = float(final_raw[0])
-            predicted_idx = int(np.round(display_val))
-        else:
-            # Softmax
-            exps = np.exp(final_raw - np.max(final_raw))
-            probs = exps / exps.sum()
-            display_val = float(probs[1])     # Probability of class 1 (Yes/Depression)
-            predicted_idx = int(np.argmax(probs))
+        return all_activations, all_predictions
 
-        predicted_class = (
-            self.class_labels[predicted_idx]
-            if predicted_idx < len(self.class_labels)
-            else str(predicted_idx)
-        )
+    def create_animation(self, X):
+        """
+        Generates an animation visualizing the forward pass for multiple input samples in X.
+        """
+        all_activations, all_predictions = self._get_all_sample_results(X)
+        num_samples = len(X)
+        num_layers = len(self.layer_sizes)
+
+        # Total frames: (layers per sample) * num_samples
+        total_frames = num_samples * num_layers
 
         # ==========================================================
         # PLOTTING BASE
@@ -80,7 +104,7 @@ class NeuralNetworkVisualizer:
         # ==========================================================
         # STATIC RED CONNECTION LINES
         # ==========================================================
-        for i in range(len(self.layer_sizes) - 1):
+        for i in range(num_layers - 1):
             n_from, n_to = len(y_positions[i]), len(y_positions[i + 1])
             dense = n_from * n_to
 
@@ -96,43 +120,50 @@ class NeuralNetworkVisualizer:
                     ax.plot([i, i + 1], [y1, y2], "r-", alpha=alpha, lw=lw, zorder=1)
 
         # ==========================================================
-        # INPUT LABELS
+        # DYNAMIC LABELS
         # ==========================================================
+        
+        # Input Labels
+        input_label_objs = []
         if self.feature_names:
             for idx, y in enumerate(y_positions[0]):
                 if idx < len(self.feature_names):
-                    name = self.feature_names[idx]
-                    val = float(input_sample[idx])
-                    ax.text(-0.1, y, f"{name}\n({val:.2f})",
-                            ha="right", va="center",
-                            fontsize=9, color="#333")
+                    obj = ax.text(-0.1, y, "",
+                                  ha="right", va="center",
+                                  fontsize=9, color="#333")
+                    input_label_objs.append(obj)
 
-        # ==========================================================
-        # OUTPUT LABEL (HIDDEN INITIALLY)
-        # ==========================================================
-        out_x = len(self.layer_sizes) - 1
+        # Output Label
+        out_x = num_layers - 1
         out_y = y_positions[-1][0]
-        result_text = f"Output: {display_val:.3f}\nPred: {predicted_class}"
-
         output_text_obj = ax.text(
-            out_x + 0.1, out_y, result_text,
+            out_x + 0.1, out_y, "",
             ha="left", va="center",
             fontsize=12, fontweight="bold",
-            alpha=0.0,  # hidden until last frame
+            alpha=0.0,
             zorder=20
         )
+        
+        # Sample Indicator
+        sample_indicator = ax.text(
+            0.5, 1.05, f"Sample 1 of {num_samples}",
+            ha="center", va="bottom",
+            fontsize=14, fontweight="bold",
+            transform=ax.transAxes
+        )
+
 
         # ==========================================================
         # DRAW NEURONS
         # ==========================================================
         scatter_points = []
-        for i in range(len(self.layer_sizes)):
+        for i in range(num_layers):
             initial_colors = np.full(self.layer_sizes[i], 0.5)
             scat = ax.scatter(
                 x_positions[i], y_positions[i],
                 s=300,
                 c=initial_colors,
-                cmap="plasma",
+                cmap="viridis",
                 vmin=0.0, vmax=1.0,
                 edgecolors="black",
                 zorder=10
@@ -151,21 +182,45 @@ class NeuralNetworkVisualizer:
                             fraction=0.05, pad=0.08)
         cbar.set_label("Relative activation (low → high)", fontsize=10)
 
-        ax.set_title("Neural Network Processing Animation", fontsize=16)
+        ax.set_title("Neural Network Multi-Sample Processing Animation", fontsize=16)
 
         # ==========================================================
         # ANIMATION UPDATE FUNCTION
         # ==========================================================
         def update(frame):
-            if frame >= len(activations):
-                return []
+            # Determine which sample and which layer we are on
+            sample_idx = frame // num_layers
+            layer_idx = frame % num_layers
+            
+            # Use activations and prediction results for the current sample
+            current_activations = all_activations[sample_idx]
+            current_result = all_predictions[sample_idx]
+            current_input = current_result['input_sample']
 
             artists = []
+            
+            # --- Update Sample Indicator ---
+            sample_indicator.set_text(f"Sample {sample_idx + 1} of {num_samples}")
+            artists.append(sample_indicator)
 
-            # Min–max normalization across all layers up to current frame
+            # --- Update Input Labels in Layer 0 ---
+            if layer_idx == 0 and self.feature_names:
+                for idx, name in enumerate(self.feature_names):
+                    if idx < len(current_input):
+                        val = float(current_input[idx])
+                        input_label_objs[idx].set_text(f"{name}\n({val:.2f})")
+                        
+            # --- Reset and Update Neuron Colors ---
+            # Reset colors of later layers when moving to a new sample
+            if layer_idx == 0 and frame > 0:
+                for scat in scatter_points:
+                    scat.set_array(np.full(len(scat.get_offsets()), 0.5))
+                output_text_obj.set_alpha(0.0)
+            
+            # Min–max normalization across all layers processed *so far* for the current sample
             all_vals = np.concatenate([
-                activations[k].flatten().astype(float)
-                for k in range(frame + 1)
+                current_activations[k].flatten().astype(float)
+                for k in range(layer_idx + 1)
             ])
 
             vmin = np.percentile(all_vals, 5)
@@ -174,17 +229,22 @@ class NeuralNetworkVisualizer:
                 vmax = vmin + 1e-6
 
             # Update layer color values
-            for layer_idx in range(frame + 1):
-                vals = activations[layer_idx].flatten().astype(float)
+            for l_idx in range(layer_idx + 1):
+                vals = current_activations[l_idx].flatten().astype(float)
                 vals = np.clip(vals, vmin, vmax)
                 norm_vals = (vals - vmin) / (vmax - vmin)
 
-                n = min(len(norm_vals), self.layer_sizes[layer_idx])
-                scatter_points[layer_idx].set_array(norm_vals[:n])
-                artists.append(scatter_points[layer_idx])
-
-            # Reveal output only at last frame
-            if frame == len(activations) - 1:
+                n = min(len(norm_vals), self.layer_sizes[l_idx])
+                scatter_points[l_idx].set_array(norm_vals[:n])
+                artists.append(scatter_points[l_idx])
+            
+            # --- Update Output Text ---
+            if layer_idx == num_layers - 1:
+                result_text = (
+                    f"Output: {current_result['display_val']:.3f}\n"
+                    f"Pred: {current_result['predicted_class']}"
+                )
+                output_text_obj.set_text(result_text)
                 output_text_obj.set_alpha(1.0)
             else:
                 output_text_obj.set_alpha(0.0)
@@ -196,7 +256,7 @@ class NeuralNetworkVisualizer:
         # ==========================================================
         anim = FuncAnimation(
             fig, update,
-            frames=len(activations),
+            frames=total_frames,
             interval=700,
             blit=False
         )
