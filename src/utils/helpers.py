@@ -159,7 +159,7 @@ def preprocessing(df):
     return df
 
 
-def generate_submission(y_pred, modelName):
+def generate_submission(df, modelName):
     """
     Generates a CSV file with columns 'ids' and 'depression'
     saved to the directory in the environment variable RESULSTS_LOCATION.
@@ -171,12 +171,12 @@ def generate_submission(y_pred, modelName):
 
     os.makedirs(results_dir, exist_ok=True)
     output_path = os.path.join(
-        results_dir, f"submission_{modelName}_{y_pred['id'].iloc[0]}.csv"
+        results_dir, f"submission_{modelName}_{df['id'].iloc[0]}.csv"
     )
 
     # Handle both DataFrame and tuple inputs
-    if isinstance(y_pred, pd.DataFrame):
-        df = y_pred.rename(columns={"id": "id", "y_pred": "depression"})
+    if isinstance(df, pd.DataFrame):
+        df = df.rename(columns={"id": "id", "y_pred": "depression"})
     else:
         raise TypeError("y_pred must be a DataFrame with 'id' and 'y_pred' columns.")
 

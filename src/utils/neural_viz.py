@@ -48,7 +48,7 @@ class NeuralNetworkVisualizer:
 
             # --- Calculate Model Prediction ---
             final_raw = self.model(input_sample.reshape(1, -1)).numpy().ravel()
-            
+
             if final_raw.shape[0] == 1:
                 # Binary sigmoid
                 display_val = float(final_raw[0])
@@ -66,7 +66,7 @@ class NeuralNetworkVisualizer:
                 if predicted_idx < len(self.class_labels)
                 else str(predicted_idx)
             )
-            
+
             all_activations.append(sample_activations)
             all_predictions.append({
                 'display_val': display_val,
@@ -122,7 +122,7 @@ class NeuralNetworkVisualizer:
         # ==========================================================
         # DYNAMIC LABELS
         # ==========================================================
-        
+
         # Input Labels
         input_label_objs = []
         if self.feature_names:
@@ -143,7 +143,7 @@ class NeuralNetworkVisualizer:
             alpha=0.0,
             zorder=20
         )
-        
+
         # Sample Indicator
         sample_indicator = ax.text(
             0.5, 1.05, f"Sample 1 of {num_samples}",
@@ -151,7 +151,6 @@ class NeuralNetworkVisualizer:
             fontsize=14, fontweight="bold",
             transform=ax.transAxes
         )
-
 
         # ==========================================================
         # DRAW NEURONS
@@ -173,8 +172,7 @@ class NeuralNetworkVisualizer:
         # ==========================================================
         # COLORBAR (BOTTOM)
         # ==========================================================
-        sm = plt.cm.ScalarMappable(cmap="plasma",
-                                   norm=plt.Normalize(0.0, 1.0))
+        sm = plt.cm.ScalarMappable(cmap="viridis", norm=plt.Normalize(0.0, 1.0))
         sm.set_array([])
 
         cbar = fig.colorbar(sm, ax=ax,
@@ -191,14 +189,14 @@ class NeuralNetworkVisualizer:
             # Determine which sample and which layer we are on
             sample_idx = frame // num_layers
             layer_idx = frame % num_layers
-            
+
             # Use activations and prediction results for the current sample
             current_activations = all_activations[sample_idx]
             current_result = all_predictions[sample_idx]
             current_input = current_result['input_sample']
 
             artists = []
-            
+
             # --- Update Sample Indicator ---
             sample_indicator.set_text(f"Sample {sample_idx + 1} of {num_samples}")
             artists.append(sample_indicator)
@@ -209,14 +207,14 @@ class NeuralNetworkVisualizer:
                     if idx < len(current_input):
                         val = float(current_input[idx])
                         input_label_objs[idx].set_text(f"{name}\n({val:.2f})")
-                        
+
             # --- Reset and Update Neuron Colors ---
             # Reset colors of later layers when moving to a new sample
             if layer_idx == 0 and frame > 0:
                 for scat in scatter_points:
                     scat.set_array(np.full(len(scat.get_offsets()), 0.5))
                 output_text_obj.set_alpha(0.0)
-            
+
             # Min–max normalization across all layers processed *so far* for the current sample
             all_vals = np.concatenate([
                 current_activations[k].flatten().astype(float)
@@ -237,7 +235,7 @@ class NeuralNetworkVisualizer:
                 n = min(len(norm_vals), self.layer_sizes[l_idx])
                 scatter_points[l_idx].set_array(norm_vals[:n])
                 artists.append(scatter_points[l_idx])
-            
+
             # --- Update Output Text ---
             if layer_idx == num_layers - 1:
                 result_text = (

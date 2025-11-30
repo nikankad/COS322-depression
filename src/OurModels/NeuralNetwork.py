@@ -2,12 +2,13 @@ import os
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
 from sklearn.model_selection import train_test_split
-from tensorflow import keras
-from tensorflow.keras import layers
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from keras.models import load_model
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras.models import load_model
+import visualkeras
 
 
 class NeuralNetwork:
@@ -38,6 +39,7 @@ class NeuralNetwork:
 
         self.model = keras.Sequential(layers_list)
 
+
         self.model.compile(
             optimizer=keras.optimizers.Adam(3e-4),
             loss="binary_crossentropy",
@@ -51,7 +53,7 @@ class NeuralNetwork:
 
         """Preprocess and split data"""
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
+            X, y, test_size=0.2, random_state=42, stratify=y
         )
         y_train = keras.utils.to_categorical(y_train, self.num_classes)
         y_test = keras.utils.to_categorical(y_test, self.num_classes)
