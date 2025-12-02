@@ -206,7 +206,7 @@ class NeuralNetworkVisualizer:
                 for idx, name in enumerate(self.feature_names):
                     if idx < len(current_input):
                         val = float(current_input[idx])
-                        input_label_objs[idx].set_text(f"{name}\n({val:.2f})")
+                        input_label_objs[idx].set_text(f"{name}\n({val:.4})")
 
             # --- Reset and Update Neuron Colors ---
             # Reset colors of later layers when moving to a new sample

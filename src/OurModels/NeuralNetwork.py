@@ -14,9 +14,6 @@ import visualkeras
 class NeuralNetwork:
 
     def __init__(self):
-        """
-        LogisticRegression
-        """
         self.input_dim = 16
         self.num_classes = 2
         self.model = None
@@ -114,9 +111,6 @@ class NeuralNetwork:
         import seaborn as sns
         import numpy as np
 
-        # -------------------------
-        # ROC Curve + AUC
-        # -------------------------
         fpr, tpr, thresholds = roc_curve(y_test, y_scores)
         roc_auc = auc(fpr, tpr)
 
@@ -129,9 +123,7 @@ class NeuralNetwork:
         ax[0].set_title("ROC Curve")
         ax[0].legend()
 
-        # -------------------------
-        # Confusion Matrix
-        # -------------------------
+       
         cm = confusion_matrix(y_test, y_pred)
         sns.heatmap(
             cm,
@@ -147,16 +139,8 @@ class NeuralNetwork:
         ax[1].set_ylabel("Actual")
 
         plt.tight_layout()
-        plt.show()
-
-        # -------------------------
-        # Classification Report
-        # -------------------------
+        plt.show()    
         print(classification_report(y_test, y_pred))
-
-        # -------------------------
-        # Accuracy
-        # -------------------------
         acc = np.mean(y_pred == y_test)
         print(f"Accuracy: {acc:.4f}")
 

@@ -10,9 +10,6 @@ import pandas as pd
 class XGBoostModel:
 
     def __init__(self):
-        """
-        LogisticRegression
-        """
         self.model = xgb.XGBClassifier(
         objective='multi:softmax',  # multiclass classification
         num_class=3,
@@ -53,7 +50,7 @@ class XGBoostModel:
         fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
         # ROC curve
-        ax[0].plot(fpr, tpr, color='blue', label='ROC curve (area = %0.2f)' % roc_auc)
+        ax[0].plot(fpr, tpr, color='blue', label='ROC curve (area = %0.4)' % roc_auc)
         ax[0].plot([0, 1], [0, 1], color='red', linestyle='--')
         ax[0].set_xlim([0.0, 1.0])
         ax[0].set_ylim([0.0, 1.05])
@@ -76,7 +73,7 @@ class XGBoostModel:
         print(reportMetrics)
        
         accuracy = self.model.score(self.X_test, self.y_test)
-        print(f'Model Accuracy: {accuracy:.2f}')
+        print(f'Model Accuracy: {accuracy:.4}')
     def predict(self, newdf):
         """
         Predicts class labels on a new DataFrame using a pre-trained model.

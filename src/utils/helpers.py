@@ -1,9 +1,21 @@
 # from sklearn.calibration import LabelEncoder
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 import pandas as pd
 import numpy as np
 import os
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import classification_report, confusion_matrix, precision_recall_curve, roc_curve, auc
+import matplotlib.pyplot as plt 
+import seaborn as sns
+
+def prepare_xy(df: pd.DataFrame):
+        # """ Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
+
+        numeric_df = df.select_dtypes(include=["int64", "float64", "int32", "float32"])
+
+        X = numeric_df.drop(columns=["depression", "id"])
+        y = numeric_df["depression"]
+
+        return X, y
 
 
 def preprocessing(df):
@@ -182,3 +194,46 @@ def generate_submission(df, modelName):
 
     df.to_csv(output_path, index=False)
     print(f"Submission saved to: {output_path}")
+
+def report_metrics(model, threshold, X_test, y_test):
+        probs = model.predict_proba(X_test)[:, 1]
+        y_pred = (probs >= threshold).astype(int)
+
+        print(classification_report(y_test, y_pred))
+
+        # ROC Curve
+        fpr, tpr, _ = roc_curve(y_test, probs)
+        roc_auc = auc(fpr, tpr)
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+
+        ax[0].plot(fpr, tpr, label=f'AUC={roc_auc:.3f}')
+        ax[0].set_title("ROC Curve")
+        ax[0].set_xlabel("FPR")
+        ax[0].set_ylabel("TPR")
+        ax[0].legend()
+
+        cm = confusion_matrix(y_test, y_pred)
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax[1])
+        ax[1].set_title(f"Confusion Matrix (threshold={threshold:.3f})")
+        ax[1].set_xlabel("Predicted")
+        ax[1].set_ylabel("Actual")
+
+        plt.tight_layout()
+        plt.show()
+
+
+def find_best_threshold(model, X_test, y_test):
+        probs = model.predict_proba(X_test)[:, 1]
+
+        precisions, recalls, thresholds = precision_recall_curve(y_test, probs)
+        f1_scores = 2 * (precisions * recalls) / (precisions + recalls + 1e-7)
+
+        best_idx = np.argmax(f1_scores)
+
+        best_threshold = thresholds[best_idx]
+        best_f1 = f1_scores[best_idx]
+        best_precision = precisions[best_idx]
+        best_recall = recalls[best_idx]
+
+        return best_threshold, best_f1, best_precision, best_recall

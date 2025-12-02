@@ -1,11 +1,8 @@
 from catboost import CatBoostClassifier
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.metrics import classification_report, confusion_matrix, precision_recall_curve
-from sklearn.metrics import roc_curve, auc
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report
+from utils.helpers import find_best_threshold, prepare_xy, report_metrics
+
 
 
 class CatBoost:
@@ -32,24 +29,23 @@ class CatBoost:
         self.y_test = None
         self.threshold = threshold
 
-    # ---------------------------------------------------------
+    
     def _prepare_xy(self, df):
-        numeric_df = df.select_dtypes(include=['int32', 'int64', 'float32', 'float64'])
-        X = numeric_df.drop(columns=["depression", "id"])
-        y = numeric_df['depression']
-        return X, y
+        return prepare_xy(df)
 
-    # ---------------------------------------------------------
+    
     def train(self, df):
-        X, y = self._prepare_xy(df)
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
-        self.model.fit(X_train, y_train, eval_set=(X_test, y_test), verbose=False)
+        X, y = prepare_xy(df)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        self.model.fit(X_train, y_train)
+        
+        # Store test set and probabilities
         self.X_test = X_test
         self.y_test = y_test
-
-    # ---------------------------------------------------------
+        self.y_proba = self.model.predict(X_test, prediction_type='Probability')[:, 1]  # CatBoost syntax
+        
+        return self.y_proba, y_test
+    
     def tune(self, df):
         X, y = self._prepare_xy(df)
 
@@ -111,7 +107,7 @@ class CatBoost:
         self.X_test = X_test
         self.y_test = y_test
 
-    # ---------------------------------------------------------
+    
     def predict(self, newdf):
         X_new = newdf.select_dtypes(include=['number'])
         probs = self.model.predict_proba(X_new)[:, 1]
@@ -121,48 +117,13 @@ class CatBoost:
         result['y_pred'] = preds
         return result
 
-    # ---------------------------------------------------------
+    
     def report(self):
-        probs = self.model.predict_proba(self.X_test)[:, 1]
-        y_pred = (probs >= self.threshold).astype(int)
+        report_metrics(self.model, self.threshold, self.X_test, self.y_test)  # Pass y_test, not y_pred
+        
 
-        print(classification_report(self.y_test, y_pred))
-
-        # ROC Curve
-        fpr, tpr, _ = roc_curve(self.y_test, probs)
-        roc_auc = auc(fpr, tpr)
-
-        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-
-        ax[0].plot(fpr, tpr, label=f'AUC={roc_auc:.3f}')
-        ax[0].set_title("ROC Curve")
-        ax[0].set_xlabel("FPR")
-        ax[0].set_ylabel("TPR")
-        ax[0].legend()
-
-        cm = confusion_matrix(self.y_test, y_pred)
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax[1])
-        ax[1].set_title(f"Confusion Matrix (threshold={self.threshold:.3f})")
-        ax[1].set_xlabel("Predicted")
-        ax[1].set_ylabel("Actual")
-
-        plt.tight_layout()
-        plt.show()
-
-    # ---------------------------------------------------------
-    def find_best_threshold(self):
-        probs = self.model.predict_proba(self.X_test)[:, 1]
-
-        precisions, recalls, thresholds = precision_recall_curve(self.y_test, probs)
-        f1_scores = 2 * (precisions * recalls) / (precisions + recalls + 1e-7)
-
-        best_idx = np.argmax(f1_scores)
-
-        best_threshold = thresholds[best_idx]
-        best_f1 = f1_scores[best_idx]
-        best_precision = precisions[best_idx]
-        best_recall = recalls[best_idx]
-
-        self.threshold = 0.2  # store internally
-
-        return best_threshold, best_f1, best_precision, best_recall
+    
+    def best_threshold(self):
+        results = find_best_threshold(self.model, self.X_test, self.y_test)
+        self.threshold = results[0]
+        return results
