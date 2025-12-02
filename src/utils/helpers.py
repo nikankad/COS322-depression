@@ -3,9 +3,18 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import pandas as pd
 import numpy as np
 import os
-from sklearn.metrics import classification_report, confusion_matrix, precision_recall_curve, roc_curve, auc
 import matplotlib.pyplot as plt 
 import seaborn as sns
+from sklearn.metrics import (
+    classification_report, confusion_matrix, roc_curve, auc,
+    precision_recall_curve, average_precision_score,
+    matthews_corrcoef, cohen_kappa_score,
+    balanced_accuracy_score, f1_score, precision_score, recall_score,
+    log_loss, brier_score_loss
+)
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
 def prepare_xy(df: pd.DataFrame):
         # """ Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
@@ -195,32 +204,168 @@ def generate_submission(df, modelName):
     df.to_csv(output_path, index=False)
     print(f"Submission saved to: {output_path}")
 
+
 def report_metrics(model, threshold, X_test, y_test):
-        probs = model.predict_proba(X_test)[:, 1]
-        y_pred = (probs >= threshold).astype(int)
-
-        print(classification_report(y_test, y_pred))
-
-        # ROC Curve
-        fpr, tpr, _ = roc_curve(y_test, probs)
-        roc_auc = auc(fpr, tpr)
-
-        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
-
-        ax[0].plot(fpr, tpr, label=f'AUC={roc_auc:.3f}')
-        ax[0].set_title("ROC Curve")
-        ax[0].set_xlabel("FPR")
-        ax[0].set_ylabel("TPR")
-        ax[0].legend()
-
-        cm = confusion_matrix(y_test, y_pred)
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax[1])
-        ax[1].set_title(f"Confusion Matrix (threshold={threshold:.3f})")
-        ax[1].set_xlabel("Predicted")
-        ax[1].set_ylabel("Actual")
-
-        plt.tight_layout()
-        plt.show()
+    """
+    Comprehensive metrics report for binary classification.
+    """
+    # Get predictions
+    probs = model.predict_proba(X_test)[:, 1]
+    y_pred = (probs >= threshold).astype(int)
+    
+    # ============= CLASSIFICATION REPORT =============
+    print("="*60)
+    print("CLASSIFICATION REPORT")
+    print("="*60)
+    print(classification_report(y_test, y_pred))
+    
+    # ============= ADDITIONAL METRICS =============
+    print("\n" + "="*60)
+    print("ADDITIONAL METRICS")
+    print("="*60)
+    
+    # Confusion Matrix values
+    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+    
+    # Basic metrics
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    precision = precision_score(y_test, y_pred, zero_division=0)
+    recall = recall_score(y_test, y_pred, zero_division=0)
+    f1 = f1_score(y_test, y_pred, zero_division=0)
+    
+    # Advanced metrics
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    npv = tn / (tn + fn) if (tn + fn) > 0 else 0  # Negative Predictive Value
+    balanced_acc = balanced_accuracy_score(y_test, y_pred)
+    mcc = matthews_corrcoef(y_test, y_pred)  # Matthews Correlation Coefficient
+    kappa = cohen_kappa_score(y_test, y_pred)  # Cohen's Kappa
+    
+    # Probability-based metrics
+    logloss = log_loss(y_test, probs)
+    brier = brier_score_loss(y_test, probs)
+    
+    # ROC and PR AUC
+    fpr, tpr, _ = roc_curve(y_test, probs)
+    roc_auc = auc(fpr, tpr)
+    avg_precision = average_precision_score(y_test, probs)
+    
+    # Print metrics
+    print(f"Threshold:                {threshold:.3f}")
+    print(f"\nConfusion Matrix Components:")
+    print(f"  True Positives (TP):    {tp}")
+    print(f"  True Negatives (TN):    {tn}")
+    print(f"  False Positives (FP):   {fp}")
+    print(f"  False Negatives (FN):   {fn}")
+    
+    print(f"\nBasic Metrics:")
+    print(f"  Accuracy:               {accuracy:.4f}")
+    print(f"  Precision (PPV):        {precision:.4f}")
+    print(f"  Recall (Sensitivity):   {recall:.4f}")
+    print(f"  Specificity (TNR):      {specificity:.4f}")
+    print(f"  F1-Score:               {f1:.4f}")
+    
+    print(f"\nAdvanced Metrics:")
+    print(f"  Balanced Accuracy:      {balanced_acc:.4f}")
+    print(f"  NPV (Neg Pred Value):   {npv:.4f}")
+    print(f"  MCC (Matthews Corr):    {mcc:.4f}")
+    print(f"  Cohen's Kappa:          {kappa:.4f}")
+    
+    print(f"\nProbability Metrics:")
+    print(f"  ROC AUC:                {roc_auc:.4f}")
+    print(f"  PR AUC (Avg Precision): {avg_precision:.4f}")
+    print(f"  Log Loss:               {logloss:.4f}")
+    print(f"  Brier Score:            {brier:.4f}")
+    
+    # Additional ratios
+    print(f"\nDiagnostic Ratios:")
+    ppv = precision  # Positive Predictive Value (same as precision)
+    lr_plus = recall / (1 - specificity) if specificity < 1 else float('inf')
+    lr_minus = (1 - recall) / specificity if specificity > 0 else float('inf')
+    dor = lr_plus / lr_minus if lr_minus > 0 else float('inf')  # Diagnostic Odds Ratio
+    
+    print(f"  LR+ (Likelihood Ratio+): {lr_plus:.4f}")
+    print(f"  LR- (Likelihood Ratio-): {lr_minus:.4f}")
+    print(f"  DOR (Diagnostic Odds):   {dor:.4f}")
+    
+    # ============= VISUALIZATIONS =============
+    fig, ax = plt.subplots(2, 2, figsize=(14, 12))
+    
+    # 1. ROC Curve
+    ax[0, 0].plot(fpr, tpr, label=f'ROC (AUC={roc_auc:.3f})', linewidth=2)
+    ax[0, 0].plot([0, 1], [0, 1], 'k--', label='Random', linewidth=1)
+    ax[0, 0].set_title("ROC Curve", fontsize=12, fontweight='bold')
+    ax[0, 0].set_xlabel("False Positive Rate")
+    ax[0, 0].set_ylabel("True Positive Rate")
+    ax[0, 0].legend()
+    ax[0, 0].grid(True, alpha=0.3)
+    
+    # 2. Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax[0, 1],
+                cbar_kws={'label': 'Count'})
+    ax[0, 1].set_title(f"Confusion Matrix (threshold={threshold:.3f})", 
+                       fontsize=12, fontweight='bold')
+    ax[0, 1].set_xlabel("Predicted Label")
+    ax[0, 1].set_ylabel("True Label")
+    
+    # 3. Precision-Recall Curve
+    precision_vals, recall_vals, _ = precision_recall_curve(y_test, probs)
+    ax[1, 0].plot(recall_vals, precision_vals, 
+                  label=f'PR (AP={avg_precision:.3f})', linewidth=2)
+    ax[1, 0].set_title("Precision-Recall Curve", fontsize=12, fontweight='bold')
+    ax[1, 0].set_xlabel("Recall")
+    ax[1, 0].set_ylabel("Precision")
+    ax[1, 0].legend()
+    ax[1, 0].grid(True, alpha=0.3)
+    
+    # 4. Probability Distribution
+    ax[1, 1].hist(probs[y_test == 0], bins=30, alpha=0.6, label='Class 0 (Negative)', 
+                  color='blue', edgecolor='black')
+    ax[1, 1].hist(probs[y_test == 1], bins=30, alpha=0.6, label='Class 1 (Positive)', 
+                  color='red', edgecolor='black')
+    ax[1, 1].axvline(threshold, color='green', linestyle='--', linewidth=2, 
+                     label=f'Threshold={threshold:.3f}')
+    ax[1, 1].set_title("Predicted Probability Distribution", 
+                       fontsize=12, fontweight='bold')
+    ax[1, 1].set_xlabel("Predicted Probability")
+    ax[1, 1].set_ylabel("Frequency")
+    ax[1, 1].legend()
+    ax[1, 1].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # ============= THRESHOLD ANALYSIS =============
+    print("\n" + "="*60)
+    print("THRESHOLD SENSITIVITY ANALYSIS")
+    print("="*60)
+    
+    thresholds_to_test = [0.3, 0.4, 0.5, 0.6, 0.7]
+    print(f"{'Threshold':<12} {'Precision':<12} {'Recall':<12} {'F1':<12} {'Accuracy':<12}")
+    print("-" * 60)
+    for thresh in thresholds_to_test:
+        y_pred_temp = (probs >= thresh).astype(int)
+        prec = precision_score(y_test, y_pred_temp, zero_division=0)
+        rec = recall_score(y_test, y_pred_temp, zero_division=0)
+        f1_temp = f1_score(y_test, y_pred_temp, zero_division=0)
+        acc = (y_test == y_pred_temp).mean()
+        print(f"{thresh:<12.2f} {prec:<12.4f} {rec:<12.4f} {f1_temp:<12.4f} {acc:<12.4f}")
+    
+    return {
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'specificity': specificity,
+        'f1': f1,
+        'balanced_accuracy': balanced_acc,
+        'mcc': mcc,
+        'kappa': kappa,
+        'roc_auc': roc_auc,
+        'pr_auc': avg_precision,
+        'log_loss': logloss,
+        'brier_score': brier,
+        'confusion_matrix': cm
+    }
 
 
 def find_best_threshold(model, X_test, y_test):
