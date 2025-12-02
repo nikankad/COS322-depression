@@ -8,15 +8,21 @@ from sklearn.preprocessing import StandardScaler
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import load_model
+from utils.helpers import report_metrics
 import visualkeras
 
 
 class NeuralNetwork:
 
-    def __init__(self):
+    def __init__(self, threshold=0.5):
         self.input_dim = 16
         self.num_classes = 2
         self.model = None
+        self.X_test = None
+        self.y_test = None
+        self.y_pred = None
+        self.threshold = threshold
+
 
     def build_model(self, hidden_units=[64, 32]):
         layers_list = [keras.Input(shape=(self.input_dim,))]
@@ -88,11 +94,16 @@ class NeuralNetwork:
             validation_split=validation_split,
             verbose=1,
         )
+        
 
     def evaluate(self, X_test, y_test):
         """Evaluate on test data"""
         loss, accuracy = self.model.evaluate(X_test, y_test, verbose=0)
         return {"loss": loss, "accuracy": accuracy}
+
+    def report(self):
+        # Convert NN probabilities into a format report_metrics expects
+        report_metrics(self.model, self.threshold, self.X_test, self.y_test)
 
     def report(self, y_pred, y_test, y_scores):
         """

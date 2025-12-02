@@ -1,9 +1,9 @@
 from .SVCModel import SVCModel
 from .RandomForestClassifierModel import RandomForestClassifierModel
-# from .XGBoostModel import XGBoostModel
+from .XGBoostModel import XGBoostModel
 from .LogisticRegressionModel import LogisticRegressionModel
-from .NeuralNetwork import NeuralNetwork
-from .CatBoost import CatBoost
+from .NeuralNetworkModel import NeuralNetworkModel
+from .CatBoostModel import CatBoostModel
 # from .utils.neural_viz import NeuralNetworkVisualizer
 
 
@@ -11,8 +11,8 @@ __all__ = [
     "SVCModel",
     "RandomForestClassifierModel",
     "LogisticRegressionModel",
-    "CatBoost",
-    # "XGBoostModel",
-    "NeuralNetwork",
+    "CatBoostModel",
+    "XGBoostModel",
+    "NeuralNetworkModel",
     # "NeuralNetworkVisualizer"
 ]

@@ -1,88 +1,109 @@
-from matplotlib import pyplot as plt
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-import seaborn as sns
-from sklearn.metrics import roc_curve, auc
-import pandas as pd
+
+from utils.helpers import prepare_xy, report_metrics, find_best_threshold
+
 
 class XGBoostModel:
 
-    def __init__(self):
+    def __init__(self, threshold=0.5):
         self.model = xgb.XGBClassifier(
-        objective='multi:softmax',  # multiclass classification
-        num_class=3,
-        eval_metric='mlogloss',
-        use_label_encoder=False
+            objective='binary:logistic',
+            eval_metric='logloss',
+            subsample=1.0,
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.05,
+            colsample_bytree=0.8,
+            tree_method='hist',
+            random_state=42
         )
+
         self.X_test = None
         self.y_test = None
         self.y_pred = None
-    
-    def _prepare_xy(self, df: pd.DataFrame):
-        """Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
-
-        numeric_df = df.select_dtypes(include=['int64', 'float64', 'int32', 'float32'])
-
-        X = numeric_df.drop(columns=['depression'])
-        y = numeric_df['depression']
-        return X, y
+        self.threshold = threshold
 
 
     def train(self, df):
-        X, y = self._prepare_xy(df)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X, y = prepare_xy(df)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+
         self.model.fit(X_train, y_train)
 
-        # Store test set for charts
+        # Store test set
         self.X_test = X_test
         self.y_test = y_test
-        # Predict on test set
-        y_pred = self.model.predict(X_test)
+
+        # Predict using probabilities + threshold
+        y_scores = self.model.predict_proba(X_test)[:, 1]
+        y_pred = (y_scores >= self.threshold).astype(int)
+
+        self.y_pred = y_pred
         return y_pred, y_test
-    def report(self, y_pred, y_test):
-        #roc 
-        y_scores = self.model.predict_proba(self.X_test)[:, 1]  # Get the probabilities for the positive class
-        fpr, tpr, thresholds = roc_curve(y_test, y_scores)
-        roc_auc = auc(fpr, tpr)
 
-        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
 
-        # ROC curve
-        ax[0].plot(fpr, tpr, color='blue', label='ROC curve (area = %0.4)' % roc_auc)
-        ax[0].plot([0, 1], [0, 1], color='red', linestyle='--')
-        ax[0].set_xlim([0.0, 1.0])
-        ax[0].set_ylim([0.0, 1.05])
-        ax[0].set_xlabel('False Positive Rate')
-        ax[0].set_ylabel('True Positive Rate')
-        ax[0].set_title('Receiver Operating Characteristic')
-        ax[0].legend(loc='lower right')
-
-        # Confusion Matrix
-        cm = confusion_matrix(y_test, y_pred)
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax[1], xticklabels=['No Depression', 'Depression'], yticklabels=['No Depression', 'Depression'])
-        ax[1].set_ylabel('Actual')
-        ax[1].set_xlabel('Predicted')
-        ax[1].set_title('Confusion Matrix')
-
-        plt.tight_layout()
-        plt.show()
-
-        reportMetrics = classification_report(y_test, y_pred)
-        print(reportMetrics)
-       
-        accuracy = self.model.score(self.X_test, self.y_test)
-        print(f'Model Accuracy: {accuracy:.4}')
     def predict(self, newdf):
-        """
-        Predicts class labels on a new DataFrame using a pre-trained model.
-        Returns only the id column and predictions.
-        """
-        X_new = newdf.select_dtypes(include=['number', 'float64'])
-        y_pred = self.model.predict(X_new)
+        X_new = newdf.select_dtypes(include=['number'])
+        probs = self.model.predict_proba(X_new)[:, 1]
+        preds = (probs >= self.threshold).astype(int)
 
         result = newdf[['id']].copy()
-        result['y_pred'] = y_pred
+        result['y_pred'] = preds
         return result
 
+
+    def optimize(self, df):
+        """
+        Very small XGB search space (fast).
+        """
+        from sklearn.model_selection import RandomizedSearchCV
+
+        param_dist = {
+            "learning_rate": [0.01, 0.05, 0.1],
+            "max_depth": [4, 6, 8],
+            "subsample": [0.7, 0.8, 1.0],
+            "colsample_bytree": [0.7, 0.8, 1.0],
+            "n_estimators": [200, 300, 500],
+        }
+
+        X, y = prepare_xy(df)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+
+        search = RandomizedSearchCV(
+            estimator=xgb.XGBClassifier(
+                objective='binary:logistic',
+                eval_metric='logloss',
+                random_state=42
+            ),
+            param_distributions=param_dist,
+            n_iter=10,
+            scoring="f1",
+            cv=2,
+            n_jobs=-1,
+            verbose=2,
+            random_state=42
+        )
+
+        search.fit(X_train, y_train)
+        best_model = search.best_estimator_
+
+        y_pred = (best_model.predict_proba(X_test)[:, 1] >= 0.5).astype(int)
+
+        print("Best parameters:", search.best_params_)
+        print(classification_report(y_test, y_pred))
+
+
+    def best_threshold(self):
+        results = find_best_threshold(self.model, self.X_test, self.y_test)
+        self.threshold = results[0]
+        return results
+
+
+    def report(self):
+        report_metrics(self.model, self.threshold, self.X_test, self.y_test)

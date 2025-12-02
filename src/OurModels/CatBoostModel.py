@@ -5,7 +5,7 @@ from utils.helpers import find_best_threshold, prepare_xy, report_metrics
 
 
 
-class CatBoost:
+class CatBoostModel:
 
     def __init__(self, threshold=0.5):
 
