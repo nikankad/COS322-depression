@@ -92,5 +92,5 @@ class RandomForestClassifierModel:
         self.threshold = results[0]
         return results
     def report(self):
-        report_metrics(self.model, self.threshold, self.X_test, self.y_test)
+        report_metrics(self.model, self.threshold,self.X_test, self.y_test)
         
