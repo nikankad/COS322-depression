@@ -18,7 +18,7 @@ import numpy as np
 import time
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
-
+import shap
 
 def prepare_xy(df: pd.DataFrame):
         # """ Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
@@ -429,25 +429,52 @@ def get_feature_importance(model_obj, model_name, X_train, y_train, feature_name
     except Exception as e:
         print(f"Could not compute permutation importance: {e}")
         return None
+def get_shap_importance(model_obj, X_train, X_test, feature_names, model_name):
+    """
+    Returns a DataFrame of SHAP global feature importance for any model.
+    Works for:
+      - Tree models (TreeExplainer)
+      - Logistic Regression (LinearExplainer)
+      - Neural Nets (KernelExplainer fallback)
+    """
+    try:
+        # 1. Tree-based models → fastest & most accurate
+        if model_name.lower() in ["randomforest", "xgboost", "catboost"] or \
+           hasattr(model_obj, "feature_importances_"):
+            explainer = shap.TreeExplainer(model_obj)
+            shap_values = explainer.shap_values(X_test)
+        
+        # 2. Logistic regression → linear explainer
+        elif hasattr(model_obj, "coef_"):
+            explainer = shap.LinearExplainer(model_obj, X_train)
+            shap_values = explainer.shap_values(X_test)
 
+        # 3. Neural network → fallback (slow)
+        else:
+            print(f"Using KernelExplainer for {model_name} (slow). Sampling 200 rows...")
+            background = shap.sample(X_train, 200)
+            explainer = shap.KernelExplainer(model_obj.predict_proba, background)
+            shap_values = explainer.shap_values(X_test)
+
+        # If SHAP returns list of arrays (two classes), use class 1
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
+
+        importances = np.abs(shap_values).mean(axis=0)
+
+        return pd.DataFrame({
+            "feature": feature_names,
+            "importance": importances
+        }).sort_values("importance", ascending=False)
+
+    except Exception as e:
+        print(f"SHAP failed for {model_name}: {e}")
+        return None
 
 
 def compare_models(df, models_dict, nn_model_path=None, save_path='model_comparison.csv', 
                    show_detailed_reports=True, optimize_thresholds=True):
-    """
-    Compare multiple models and save results to CSV.
-    
-    Args:
-        df: DataFrame with data
-        models_dict: Dictionary of {'Model Name': model_instance}
-        nn_model_path: Path to saved Neural Network model (if applicable)
-        save_path: Path to save CSV results
-        show_detailed_reports: If True, show full report_metrics for each model
-        optimize_thresholds: If True, find and use optimal threshold for each model
-    
-    Returns:
-        DataFrame with comparison results
-    """
+
     # Prepare data
     X, y = prepare_xy(df)
     X_train, X_test, y_train, y_test = train_test_split(
@@ -455,219 +482,181 @@ def compare_models(df, models_dict, nn_model_path=None, save_path='model_compari
     )
     
     results = []
-    
+
     for model_name, model in models_dict.items():
         print(f"\n{'='*60}")
         print(f"Processing {model_name}...")
         print(f"{'='*60}")
-        
+
         try:
-            # Handle Neural Network differently (load) vs others (train)
+            # -----------------------------
+            # LOAD OR TRAIN MODEL
+            # -----------------------------
             if model_name == 'NeuralNetwork' or 'Neural' in model_name:
-                # Load pre-trained neural network
                 if nn_model_path is None:
                     nn_model_path = os.environ.get("WEIGHT_LOCATION")
-                
+
                 if nn_model_path is None:
                     print(f"✗ No model path provided for {model_name}")
                     continue
-                
+
                 print(f"Loading from: {nn_model_path}")
                 model.load_our_model(nn_model_path, X_test, y_test)
                 training_time = 'N/A (loaded)'
-                
             else:
-                # Train other models
                 print(f"Training {model_name}...")
                 start_train = time.time()
                 model.train(df)
                 training_time = round(time.time() - start_train, 2)
                 print(f"Training completed in {training_time}s")
-            
-            # Create wrapper for consistency with report_metrics
+
+            # Wrapper for consistent predict_proba
             class ModelWrapper:
-                def __init__(self, model, is_neural_net):
+                def __init__(self, model, is_neural):
                     self.model = model
-                    self.is_neural_net = is_neural_net
-                
+                    self.is_neural = is_neural
+
                 def predict_proba(self, X):
-                    if self.is_neural_net:
-                        # Neural network returns 1D array of P(class=1)
-                        probs_class1 = self.model.predict_proba(X)
-                        probs_class0 = 1 - probs_class1
-                        return np.column_stack([probs_class0, probs_class1])
-                    else:
-                        # Other models use sklearn's fitted model
-                        return self.model.model.predict_proba(X)
-            
+                    if self.is_neural:
+                        p1 = self.model.predict_proba(X)
+                        return np.column_stack([1 - p1, p1])
+                    return self.model.model.predict_proba(X)
+
             is_nn = (model_name == 'NeuralNetwork' or 'Neural' in model_name)
-            wrapped_model = ModelWrapper(model, is_nn)
-            
-            # Optimize threshold if requested
+            wrapped = ModelWrapper(model, is_nn)
+
+            # -----------------------------
+            # THRESHOLD OPTIMIZATION
+            # -----------------------------
             original_threshold = model.threshold
             if optimize_thresholds:
-                best_thresh, best_f1, best_prec, best_rec = find_best_threshold(
-                    wrapped_model, X_test, y_test
-                )
-                print(f"Optimal threshold found: {best_thresh:.3f} (F1={best_f1:.4f})")
-                print(f"  Original threshold: {original_threshold:.3f}")
+                best_thresh, best_f1, _, _ = find_best_threshold(wrapped, X_test, y_test)
+                print(f"Optimal threshold: {best_thresh:.3f}")
                 model.threshold = best_thresh
-            
-            # Measure inference time
-            start_time = time.time()
-            probs = wrapped_model.predict_proba(X_test)[:, 1]
-            inference_time = time.time() - start_time
-            
-            # Use report_metrics to get all metrics
+
+            # -----------------------------
+            # INFERENCE TIME
+            # -----------------------------
+            start_inf = time.time()
+            probs = wrapped.predict_proba(X_test)[:, 1]
+            inference_time = round(time.time() - start_inf, 4)
+
+            # -----------------------------
+            # METRICS
+            # -----------------------------
             print(f"\nGenerating metrics for {model_name}...")
-            if show_detailed_reports:
-                # Show full detailed report
-                metrics_dict = report_metrics(wrapped_model, model.threshold, X_test, y_test)
-            else:
-                # Suppress output but still get metrics
-                import io
-                import sys
-                old_stdout = sys.stdout
-                sys.stdout = io.StringIO()
-                try:
-                    metrics_dict = report_metrics(wrapped_model, model.threshold, X_test, y_test)
-                finally:
-                    sys.stdout = old_stdout
-            
-            # Add model name and timing info to metrics
+            metrics_dict = report_metrics(wrapped, model.threshold, X_test, y_test)
+
             metrics_dict['Model'] = model_name
             metrics_dict['Training_Time_Sec'] = training_time
-            metrics_dict['Inference_Time_Sec'] = round(inference_time, 4)
+            metrics_dict['Inference_Time_Sec'] = inference_time
             metrics_dict['Threshold'] = model.threshold
-            metrics_dict['Original_Threshold'] = original_threshold if optimize_thresholds else original_threshold
-            
-            # Extract confusion matrix values
-            cm = metrics_dict['confusion_matrix']
-            tn, fp, fn, tp = cm.ravel()
-            metrics_dict['True_Positives'] = int(tp)
-            metrics_dict['True_Negatives'] = int(tn)
-            metrics_dict['False_Positives'] = int(fp)
-            metrics_dict['False_Negatives'] = int(fn)
-            
-            # Calculate NPV (not in report_metrics)
-            npv = tn / (tn + fn) if (tn + fn) > 0 else 0
-            metrics_dict['NPV'] = npv
-            
-            # Rename keys to match expected format
-            metrics_dict['Accuracy'] = metrics_dict.pop('accuracy')
-            metrics_dict['Precision'] = metrics_dict.pop('precision')
-            metrics_dict['Recall'] = metrics_dict.pop('recall')
-            metrics_dict['Specificity'] = metrics_dict.pop('specificity')
-            metrics_dict['F1_Score'] = metrics_dict.pop('f1')
-            metrics_dict['Balanced_Accuracy'] = metrics_dict.pop('balanced_accuracy')
-            metrics_dict['MCC'] = metrics_dict.pop('mcc')
-            metrics_dict['Cohen_Kappa'] = metrics_dict.pop('kappa')
-            metrics_dict['ROC_AUC'] = metrics_dict.pop('roc_auc')
-            metrics_dict['PR_AUC'] = metrics_dict.pop('pr_auc')
-            metrics_dict['Log_Loss'] = metrics_dict.pop('log_loss')
-            metrics_dict['Brier_Score'] = metrics_dict.pop('brier_score')
-            
-            # Remove confusion_matrix from dict (already extracted values)
-            del metrics_dict['confusion_matrix']
-            
-            results.append(metrics_dict)
-            
-            print(f"✓ {model_name} completed successfully")
-            print(f"  ROC AUC: {metrics_dict['ROC_AUC']:.4f}")
-            print(f"  Accuracy: {metrics_dict['Accuracy']:.4f}")
-            print(f"  F1 Score: {metrics_dict['F1_Score']:.4f}")
-            print(f"  MCC: {metrics_dict['MCC']:.4f}")
-            # Use report_metrics to get all metrics
-            print(f"\nGenerating metrics for {model_name}...")
-            # ---------------------------------------------------------
-            # FEATURE IMPORTANCE EXTRACTION
-            # ---------------------------------------------------------
-            try:
-                print(f"\nExtracting feature importance for {model_name}...")
+            metrics_dict['Original_Threshold'] = original_threshold
 
-                if fi_df is not None:
-                    print(fi_df.to_string(index=False))
-                    # Add top 5 features into metrics_dict for CSV export
-                    top_features = fi_df.head(5)
-                    for i, row in top_features.iterrows():
-                        metrics_dict[f"Top_Feature_{len(metrics_dict.get('Model','')) + i + 1}"] = f"{row['feature']} ({row['importance']:.4f})"
-                else:
-                    print(f"No feature importance available for {model_name}")
-            except Exception as e:
-                print(f"Error extracting feature importance for {model_name}: {e}")
+            # Extract confusion matrix
+            tn, fp, fn, tp = metrics_dict["confusion_matrix"].ravel()
+            metrics_dict.update({
+                "True_Positives": tp,
+                "True_Negatives": tn,
+                "False_Positives": fp,
+                "False_Negatives": fn,
+                "NPV": tn / (tn + fn) if (tn + fn) > 0 else 0
+            })
+
+            # Rename keys
+            rename_map = {
+                'accuracy': 'Accuracy',
+                'precision': 'Precision',
+                'recall': 'Recall',
+                'specificity': 'Specificity',
+                'f1': 'F1_Score',
+                'balanced_accuracy': 'Balanced_Accuracy',
+                'mcc': 'MCC',
+                'kappa': 'Cohen_Kappa',
+                'roc_auc': 'ROC_AUC',
+                'pr_auc': 'PR_AUC',
+                'log_loss': 'Log_Loss',
+                'brier_score': 'Brier_Score'
+            }
+            for old, new in rename_map.items():
+                metrics_dict[new] = metrics_dict.pop(old)
+
+            del metrics_dict["confusion_matrix"]
+
+            print(f"✓ {model_name} completed")
+            print(f"  ROC AUC = {metrics_dict['ROC_AUC']:.4f}")
+            print(f"  F1 Score = {metrics_dict['F1_Score']:.4f}")
+            print(f"  MCC = {metrics_dict['MCC']:.4f}")
+
+            # ---------------------------------------------------------
+            # FEATURE IMPORTANCE
+            # ---------------------------------------------------------
+            print(f"\nExtracting feature importance for {model_name}...")
+
+            if is_nn:
+                estimator = model                # NN model object
+            else:
+                estimator = model.model          # sklearn estimator
+
+            fi_df = None
+
+            # Native Logistic Regression importance
+            if hasattr(estimator, "coef_"):
+                fi_df = pd.DataFrame({
+                    "feature": X.columns,
+                    "importance": np.abs(estimator.coef_[0])
+                }).sort_values("importance", ascending=False)
+
+            # Native tree model importance
+            elif hasattr(estimator, "feature_importances_"):
+                fi_df = pd.DataFrame({
+                    "feature": X.columns,
+                    "importance": estimator.feature_importances_
+                }).sort_values("importance", ascending=False)
+
+            # Permutation importance fallback
+            else:
+                print(f"Using permutation importance for {model_name}...")
+                result = permutation_importance(
+                    estimator, X_test, y_test, n_repeats=5, random_state=42
+                )
+                fi_df = pd.DataFrame({
+                    "feature": X.columns,
+                    "importance": result.importances_mean
+                }).sort_values("importance", ascending=False)
+
+            print(fi_df.head(16).to_string(index=False))
+
+            # Store top 5
+            for i, row in fi_df.head(5).iterrows():
+                metrics_dict[f"Top_Feature_{i+1}"] = f"{row['feature']} ({row['importance']:.4f})"
+
+            results.append(metrics_dict)
 
         except Exception as e:
-            print(f"✗ Error with {model_name}: {str(e)}")
-            import traceback
+            print(f"✗ Error processing {model_name}: {e}")
             traceback.print_exc()
             continue
-    
-    # Create DataFrame and save
+
+    # -----------------------------
+    # FINAL RESULTS DATAFRAME
+    # -----------------------------
     df_results = pd.DataFrame(results)
-    
-    if len(df_results) == 0:
-        print("\n⚠ No models were successfully evaluated!")
+
+    if df_results.empty:
+        print("⚠ No models successfully evaluated")
         return None
-    
-    # Reorder columns for better readability
+
     column_order = [
-        'Model', 'Accuracy', 'Precision', 'Recall', 'Specificity', 'NPV',
-        'F1_Score', 'Balanced_Accuracy', 'ROC_AUC', 'PR_AUC', 
-        'MCC', 'Cohen_Kappa', 'Log_Loss', 'Brier_Score',
-        'True_Positives', 'True_Negatives', 'False_Positives', 'False_Negatives',
-        'Threshold', 'Original_Threshold', 'Training_Time_Sec', 'Inference_Time_Sec'
-    ]
-    
-    # Only include columns that exist
-    column_order = [col for col in column_order if col in df_results.columns]
+        'Model','Accuracy','Precision','Recall','Specificity','NPV','F1_Score',
+        'Balanced_Accuracy','ROC_AUC','PR_AUC','MCC','Cohen_Kappa','Log_Loss','Brier_Score',
+        'True_Positives','True_Negatives','False_Positives','False_Negatives',
+        'Threshold','Original_Threshold','Training_Time_Sec','Inference_Time_Sec'
+    ] + [col for col in df_results.columns if col.startswith("Top_Feature_")]
+
     df_results = df_results[column_order]
-    
-    # Sort by ROC_AUC
-    df_results = df_results.sort_values('ROC_AUC', ascending=False)
-    
-    # Save to CSV
+    df_results = df_results.sort_values("ROC_AUC", ascending=False)
     df_results.to_csv(save_path, index=False)
-    print(f"\n{'='*70}")
-    print(f"✓ Results saved to {save_path}")
-    print(f"{'='*70}")
-    
-    # Display summary
-    print("\n" + "="*70)
-    print("MODEL COMPARISON SUMMARY")
-    print("="*70)
-    
-    summary_cols = ['Model', 'Accuracy', 'Precision', 'Recall', 'F1_Score', 'ROC_AUC', 'MCC']
-    print(df_results[summary_cols].to_string(index=False))
-    
-    print("\n" + "="*70)
-    print("ADVANCED METRICS")
-    print("="*70)
-    advanced_cols = ['Model', 'Balanced_Accuracy', 'Specificity', 'PR_AUC', 'Log_Loss', 'Brier_Score']
-    print(df_results[advanced_cols].to_string(index=False))
-    
-    print("\n" + "="*70)
-    print("TRAINING & INFERENCE TIMES")
-    print("="*70)
-    print(df_results[['Model', 'Training_Time_Sec', 'Inference_Time_Sec']].to_string(index=False))
-    
-    print("\n" + "="*70)
-    print("CONFUSION MATRIX SUMMARY")
-    print("="*70)
-    cm_cols = ['Model', 'True_Positives', 'True_Negatives', 'False_Positives', 'False_Negatives']
-    print(df_results[cm_cols].to_string(index=False))
-    
-    # Highlight best model
-    best_model = df_results.iloc[0]
-    print("\n" + "="*70)
-    print(f"🏆 BEST MODEL (by ROC AUC): {best_model['Model']}")
-    print("="*70)
-    print(f"  ROC AUC:           {best_model['ROC_AUC']:.4f}")
-    print(f"  Accuracy:          {best_model['Accuracy']:.4f}")
-    print(f"  F1 Score:          {best_model['F1_Score']:.4f}")
-    print(f"  MCC:               {best_model['MCC']:.4f}")
-    print(f"  Precision:         {best_model['Precision']:.4f}")
-    print(f"  Recall:            {best_model['Recall']:.4f}")
-    print(f"  Balanced Accuracy: {best_model['Balanced_Accuracy']:.4f}")
-    print("="*70)
-    
+
+    print(f"\nResults saved to {save_path}")
     return df_results
