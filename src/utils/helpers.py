@@ -15,6 +15,10 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import time
+from sklearn.model_selection import train_test_split
+from sklearn.inspection import permutation_importance
+
 
 def prepare_xy(df: pd.DataFrame):
         # """ Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
@@ -383,14 +387,53 @@ def find_best_threshold(model, X_test, y_test):
 
         return best_threshold, best_f1, best_precision, best_recall
 
-import time
-from sklearn.model_selection import train_test_split
 
-from utils.helpers import prepare_xy, report_metrics, find_best_threshold
+def get_feature_importance(model_obj, model_name, X_train, y_train, feature_names):
+    """
+    Extract feature importance for any model.
+    model_obj should be the *actual estimator*, not the wrapper.
+    """
+
+    # 1. Logistic Regression
+    if hasattr(model_obj, "coef_"):
+        coefs = model_obj.coef_[0]
+        return pd.DataFrame({
+            "feature": feature_names,
+            "importance": np.abs(coefs)
+        }).sort_values("importance", ascending=False)
+
+    # 2. Tree-based models (RF, XGB, CatBoost)
+    if hasattr(model_obj, "feature_importances_"):
+        fi = model_obj.feature_importances_
+        return pd.DataFrame({
+            "feature": feature_names,
+            "importance": fi
+        }).sort_values("importance", ascending=False)
+
+    # 3. Neural Network or any other model → fallback to permutation
+    print(f"Using permutation importance for {model_name} (no native importance)...")
+
+    try:
+        result = permutation_importance(
+            model_obj,
+            X_train,
+            y_train,
+            n_repeats=8,
+            random_state=42
+        )
+        return pd.DataFrame({
+            "feature": feature_names,
+            "importance": result.importances_mean
+        }).sort_values("importance", ascending=False)
+
+    except Exception as e:
+        print(f"Could not compute permutation importance: {e}")
+        return None
+
 
 
 def compare_models(df, models_dict, nn_model_path=None, save_path='model_comparison.csv', 
-                   show_detailed_reports=False, optimize_thresholds=False):
+                   show_detailed_reports=True, optimize_thresholds=True):
     """
     Compare multiple models and save results to CSV.
     
@@ -423,7 +466,7 @@ def compare_models(df, models_dict, nn_model_path=None, save_path='model_compari
             if model_name == 'NeuralNetwork' or 'Neural' in model_name:
                 # Load pre-trained neural network
                 if nn_model_path is None:
-                    nn_model_path = os.environ.get("WEIGHT_FILE_LOCATION")
+                    nn_model_path = os.environ.get("WEIGHT_LOCATION")
                 
                 if nn_model_path is None:
                     print(f"✗ No model path provided for {model_name}")
@@ -534,7 +577,25 @@ def compare_models(df, models_dict, nn_model_path=None, save_path='model_compari
             print(f"  Accuracy: {metrics_dict['Accuracy']:.4f}")
             print(f"  F1 Score: {metrics_dict['F1_Score']:.4f}")
             print(f"  MCC: {metrics_dict['MCC']:.4f}")
-            
+            # Use report_metrics to get all metrics
+            print(f"\nGenerating metrics for {model_name}...")
+            # ---------------------------------------------------------
+            # FEATURE IMPORTANCE EXTRACTION
+            # ---------------------------------------------------------
+            try:
+                print(f"\nExtracting feature importance for {model_name}...")
+
+                if fi_df is not None:
+                    print(fi_df.to_string(index=False))
+                    # Add top 5 features into metrics_dict for CSV export
+                    top_features = fi_df.head(5)
+                    for i, row in top_features.iterrows():
+                        metrics_dict[f"Top_Feature_{len(metrics_dict.get('Model','')) + i + 1}"] = f"{row['feature']} ({row['importance']:.4f})"
+                else:
+                    print(f"No feature importance available for {model_name}")
+            except Exception as e:
+                print(f"Error extracting feature importance for {model_name}: {e}")
+
         except Exception as e:
             print(f"✗ Error with {model_name}: {str(e)}")
             import traceback
