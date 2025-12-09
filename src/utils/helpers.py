@@ -18,7 +18,6 @@ import numpy as np
 import time
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
-import shap
 
 def prepare_xy(df: pd.DataFrame):
         # """ Prepare X, y from df: drop NA, select numeric cols, handle id if present."""
@@ -178,8 +177,8 @@ def preprocessing(df):
     df[cols_to_scale] = df[cols_to_scale].fillna(df[cols_to_scale].median())
 
     # Scale
-    scaler = StandardScaler()
-    df[cols_to_scale] = scaler.fit_transform(df[cols_to_scale])
+    # scaler = StandardScaler()
+    # df[cols_to_scale] = scaler.fit_transform(df[cols_to_scale])
 
     return df
 
@@ -209,7 +208,7 @@ def generate_submission(df, modelName):
     print(f"Submission saved to: {output_path}")
 
 
-def report_metrics(model, threshold, X_test, y_test):
+def report_metrics(model, threshold, X_test, y_test, model_name):
     """
     Comprehensive metrics report for binary classification.
     """
@@ -294,50 +293,58 @@ def report_metrics(model, threshold, X_test, y_test):
     # ============= VISUALIZATIONS =============
     fig, ax = plt.subplots(2, 2, figsize=(14, 12))
     
-    # 1. ROC Curve
+        # 1. ROC Curve
     ax[0, 0].plot(fpr, tpr, label=f'ROC (AUC={roc_auc:.3f})', linewidth=2)
     ax[0, 0].plot([0, 1], [0, 1], 'k--', label='Random', linewidth=1)
-    ax[0, 0].set_title("ROC Curve", fontsize=12, fontweight='bold')
+    ax[0, 0].set_title(f"ROC Curve — {model_name}", fontsize=12, fontweight='bold')
     ax[0, 0].set_xlabel("False Positive Rate")
     ax[0, 0].set_ylabel("True Positive Rate")
     ax[0, 0].legend()
     ax[0, 0].grid(True, alpha=0.3)
-    
+
     # 2. Confusion Matrix
     cm = confusion_matrix(y_test, y_pred)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax[0, 1],
                 cbar_kws={'label': 'Count'})
-    ax[0, 1].set_title(f"Confusion Matrix (threshold={threshold:.3f})", 
-                       fontsize=12, fontweight='bold')
+    ax[0, 1].set_title(
+        f"Confusion Matrix (threshold={threshold:.3f}) — {model_name}",
+        fontsize=12, fontweight='bold'
+    )
     ax[0, 1].set_xlabel("Predicted Label")
     ax[0, 1].set_ylabel("True Label")
-    
+
     # 3. Precision-Recall Curve
     precision_vals, recall_vals, _ = precision_recall_curve(y_test, probs)
-    ax[1, 0].plot(recall_vals, precision_vals, 
-                  label=f'PR (AP={avg_precision:.3f})', linewidth=2)
-    ax[1, 0].set_title("Precision-Recall Curve", fontsize=12, fontweight='bold')
+    ax[1, 0].plot(recall_vals, precision_vals,
+                label=f'PR (AP={avg_precision:.3f})', linewidth=2)
+    ax[1, 0].set_title(f"Precision-Recall Curve — {model_name}",
+                    fontsize=12, fontweight='bold')
     ax[1, 0].set_xlabel("Recall")
     ax[1, 0].set_ylabel("Precision")
     ax[1, 0].legend()
     ax[1, 0].grid(True, alpha=0.3)
-    
+
     # 4. Probability Distribution
-    ax[1, 1].hist(probs[y_test == 0], bins=30, alpha=0.6, label='Class 0 (Negative)', 
-                  color='blue', edgecolor='black')
-    ax[1, 1].hist(probs[y_test == 1], bins=30, alpha=0.6, label='Class 1 (Positive)', 
-                  color='red', edgecolor='black')
-    ax[1, 1].axvline(threshold, color='green', linestyle='--', linewidth=2, 
-                     label=f'Threshold={threshold:.3f}')
-    ax[1, 1].set_title("Predicted Probability Distribution", 
-                       fontsize=12, fontweight='bold')
+    ax[1, 1].hist(probs[y_test == 0], bins=30, alpha=0.6,
+                label='Class 0 (Negative)', color='blue', edgecolor='black')
+    ax[1, 1].hist(probs[y_test == 1], bins=30, alpha=0.6,
+                label='Class 1 (Positive)', color='red', edgecolor='black')
+    ax[1, 1].axvline(threshold, color='green', linestyle='--', linewidth=2,
+                    label=f'Threshold={threshold:.3f}')
+    ax[1, 1].set_title(
+        f"Predicted Probability Distribution — {model_name}",
+        fontsize=12, fontweight='bold'
+    )
+    ax[1, 1].set_yscale("log")
     ax[1, 1].set_xlabel("Predicted Probability")
     ax[1, 1].set_ylabel("Frequency")
+    
     ax[1, 1].legend()
     ax[1, 1].grid(True, alpha=0.3)
-    
+
     plt.tight_layout()
     plt.show()
+
     
     # ============= THRESHOLD ANALYSIS =============
     print("\n" + "="*60)
@@ -429,47 +436,6 @@ def get_feature_importance(model_obj, model_name, X_train, y_train, feature_name
     except Exception as e:
         print(f"Could not compute permutation importance: {e}")
         return None
-def get_shap_importance(model_obj, X_train, X_test, feature_names, model_name):
-    """
-    Returns a DataFrame of SHAP global feature importance for any model.
-    Works for:
-      - Tree models (TreeExplainer)
-      - Logistic Regression (LinearExplainer)
-      - Neural Nets (KernelExplainer fallback)
-    """
-    try:
-        # 1. Tree-based models → fastest & most accurate
-        if model_name.lower() in ["randomforest", "xgboost", "catboost"] or \
-           hasattr(model_obj, "feature_importances_"):
-            explainer = shap.TreeExplainer(model_obj)
-            shap_values = explainer.shap_values(X_test)
-        
-        # 2. Logistic regression → linear explainer
-        elif hasattr(model_obj, "coef_"):
-            explainer = shap.LinearExplainer(model_obj, X_train)
-            shap_values = explainer.shap_values(X_test)
-
-        # 3. Neural network → fallback (slow)
-        else:
-            print(f"Using KernelExplainer for {model_name} (slow). Sampling 200 rows...")
-            background = shap.sample(X_train, 200)
-            explainer = shap.KernelExplainer(model_obj.predict_proba, background)
-            shap_values = explainer.shap_values(X_test)
-
-        # If SHAP returns list of arrays (two classes), use class 1
-        if isinstance(shap_values, list):
-            shap_values = shap_values[1]
-
-        importances = np.abs(shap_values).mean(axis=0)
-
-        return pd.DataFrame({
-            "feature": feature_names,
-            "importance": importances
-        }).sort_values("importance", ascending=False)
-
-    except Exception as e:
-        print(f"SHAP failed for {model_name}: {e}")
-        return None
 
 
 def compare_models(df, models_dict, nn_model_path=None, save_path='model_comparison.csv', 
@@ -545,7 +511,7 @@ def compare_models(df, models_dict, nn_model_path=None, save_path='model_compari
             # METRICS
             # -----------------------------
             print(f"\nGenerating metrics for {model_name}...")
-            metrics_dict = report_metrics(wrapped, model.threshold, X_test, y_test)
+            metrics_dict = report_metrics(wrapped, model.threshold, X_test, y_test, model_name)
 
             metrics_dict['Model'] = model_name
             metrics_dict['Training_Time_Sec'] = training_time
@@ -635,7 +601,7 @@ def compare_models(df, models_dict, nn_model_path=None, save_path='model_compari
 
         except Exception as e:
             print(f"✗ Error processing {model_name}: {e}")
-            traceback.print_exc()
+            # traceback.print_exc()
             continue
 
     # -----------------------------

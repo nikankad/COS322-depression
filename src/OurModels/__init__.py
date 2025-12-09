@@ -4,7 +4,7 @@ from .XGBoostModel import XGBoostModel
 from .LogisticRegressionModel import LogisticRegressionModel
 from .NeuralNetworkModel import NeuralNetworkModel
 from .CatBoostModel import CatBoostModel
-# from .utils.neural_viz import NeuralNetworkVisualizer
+from utils.neural_viz import NeuralNetworkVisualizer
 
 
 __all__ = [
@@ -14,5 +14,5 @@ __all__ = [
     "CatBoostModel",
     "XGBoostModel",
     "NeuralNetworkModel",
-    # "NeuralNetworkVisualizer"
+    "NeuralNetworkVisualizer"
 ]
